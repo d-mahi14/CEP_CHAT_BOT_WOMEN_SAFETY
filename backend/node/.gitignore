@@ -1,0 +1,34 @@
+# dependencies
+/node_modules
+
+# environment variables
+.env
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+logs
+*.log
+*.log.*
+
+# runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# testing
+/coverage
+
+# temp files
+/tmp
+/temp
+*.tmp
+
+# editor folders
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+.DS_Store
