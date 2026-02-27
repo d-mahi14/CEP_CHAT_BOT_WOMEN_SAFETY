@@ -1,0 +1,664 @@
+/* =====================================================
+   SOS Module CSS
+   SOSButton, Helplines, HelpHistory, NearbyResources
+   ===================================================== */
+
+/* ─── SOS Button Wrapper ─────────────────────────── */
+.sos-button-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  padding: 30px 20px;
+}
+
+.sos-instruction {
+  font-size: 0.95rem;
+  color: #64748b;
+  text-align: center;
+  margin: 0;
+  min-height: 1.4em;
+  transition: all 0.2s;
+}
+
+/* ─── SOS Button ──────────────────────────────────── */
+.sos-button {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transition: transform 0.15s ease;
+}
+
+.sos-button:active,
+.sos-button.holding {
+  transform: scale(0.97);
+}
+
+.sos-progress-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  border-radius: 50%;
+}
+
+.sos-ring-bg {
+  fill: none;
+  stroke: #fecaca;
+  stroke-width: 8;
+}
+
+.sos-ring-fill {
+  fill: none;
+  stroke: #ef4444;
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.05s linear;
+}
+
+.sos-button-inner {
+  position: absolute;
+  inset: 12px;
+  background: radial-gradient(circle at 40% 35%, #ff6b6b, #dc2626);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow:
+    0 0 0 4px rgba(220, 38, 38, 0.15),
+    0 8px 32px rgba(220, 38, 38, 0.4);
+  transition: box-shadow 0.2s;
+}
+
+.sos-button.holding .sos-button-inner {
+  box-shadow:
+    0 0 0 8px rgba(220, 38, 38, 0.25),
+    0 12px 40px rgba(220, 38, 38, 0.6);
+}
+
+.sos-label {
+  color: white;
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: 3px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+/* ─── Panic Button ────────────────────────────────── */
+.sos-panic-btn {
+  margin-top: 8px;
+  padding: 10px 24px;
+  background: transparent;
+  border: 2px solid #ef4444;
+  border-radius: 24px;
+  color: #ef4444;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sos-panic-btn:hover {
+  background: #ef4444;
+  color: white;
+}
+
+.sos-error {
+  color: #ef4444;
+  font-size: 0.85rem;
+  text-align: center;
+  margin: 0;
+}
+
+/* ─── Active SOS Screen ───────────────────────────── */
+.sos-active-screen {
+  position: fixed;
+  inset: 0;
+  background: #1a0000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  overflow: hidden;
+}
+
+.sos-active-screen.panic {
+  background: #1a0000;
+  animation: panic-flash 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes panic-flash {
+  from { background: #1a0000; }
+  to   { background: #300000; }
+}
+
+/* Pulse rings */
+.sos-pulse-ring {
+  position: absolute;
+  width: 300px;
+  height: 300px;
+  border: 3px solid rgba(239, 68, 68, 0.4);
+  border-radius: 50%;
+  animation: pulse-expand 2s ease-out infinite;
+}
+
+.sos-pulse-ring.delay1 {
+  animation-delay: 0.8s;
+}
+
+@keyframes pulse-expand {
+  0%   { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(3);   opacity: 0; }
+}
+
+.sos-active-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 40px 32px;
+  text-align: center;
+  max-width: 420px;
+  width: 100%;
+}
+
+.sos-active-icon {
+  font-size: 3.5rem;
+  animation: bounce 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes bounce {
+  from { transform: translateY(0);   }
+  to   { transform: translateY(-8px);}
+}
+
+.sos-active-title {
+  color: #fca5a5;
+  font-size: 1.6rem;
+  font-weight: 800;
+  margin: 0;
+  letter-spacing: 1px;
+}
+
+.sos-timer {
+  font-size: 3rem;
+  font-weight: 800;
+  color: white;
+  font-family: 'Courier New', monospace;
+  letter-spacing: 4px;
+}
+
+.sos-risk-badge {
+  padding: 6px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  background: rgba(239, 68, 68, 0.25);
+  color: #fca5a5;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.sos-risk-badge[data-score="9"],
+.sos-risk-badge[data-score="10"] {
+  background: rgba(239, 68, 68, 0.5);
+  animation: risk-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes risk-pulse {
+  from { border-color: rgba(239,68,68,0.3); }
+  to   { border-color: #ef4444; }
+}
+
+.sos-type-badge {
+  padding: 4px 12px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 12px;
+  color: #fde68a;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.sos-location-status {
+  color: #86efac;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.sos-location-error {
+  color: #fcd34d;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.sos-contacts-note {
+  color: #93c5fd;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.sos-resolve-actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.btn-resolve {
+  padding: 14px 28px;
+  border-radius: 12px;
+  border: none;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 140px;
+}
+
+.btn-resolve.safe {
+  background: #10b981;
+  color: white;
+}
+
+.btn-resolve.safe:hover {
+  background: #059669;
+  transform: translateY(-2px);
+}
+
+.btn-resolve.false-alarm {
+  background: rgba(255,255,255,0.1);
+  color: #d1d5db;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.btn-resolve.false-alarm:hover {
+  background: rgba(255,255,255,0.2);
+}
+
+.btn-resolve:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.sos-resolving {
+  color: #9ca3af;
+  font-size: 0.9rem;
+  animation: fade-pulse 1s ease-in-out infinite alternate;
+}
+
+@keyframes fade-pulse {
+  from { opacity: 0.5; }
+  to   { opacity: 1; }
+}
+
+/* ─── Helplines ───────────────────────────────────── */
+.helplines-container {
+  padding: 20px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.helplines-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+}
+
+.helplines-subtitle {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin: 0 0 20px 0;
+}
+
+.helplines-categories {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.cat-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 20px;
+  background: white;
+  color: #475569;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cat-btn:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.cat-btn.active {
+  background: #667eea;
+  border-color: #667eea;
+  color: white;
+}
+
+.helplines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.helpline-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: white;
+  border-radius: 12px;
+  border: 1.5px solid #f1f5f9;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  gap: 12px;
+}
+
+.helpline-left {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+}
+
+.helpline-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+}
+
+.helpline-name {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 2px 0;
+}
+
+.helpline-desc {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin: 0 0 6px 0;
+}
+
+.helpline-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.badge-24x7 {
+  padding: 2px 8px;
+  background: #dcfce7;
+  color: #16a34a;
+  border-radius: 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.badge-hours {
+  padding: 2px 8px;
+  background: #fef3c7;
+  color: #d97706;
+  border-radius: 8px;
+  font-size: 0.7rem;
+}
+
+.badge-state {
+  padding: 2px 8px;
+  background: #ede9fe;
+  color: #7c3aed;
+  border-radius: 8px;
+  font-size: 0.7rem;
+}
+
+.helpline-call-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 16px;
+  background: #ef4444;
+  color: white;
+  border-radius: 12px;
+  text-decoration: none;
+  flex-shrink: 0;
+  transition: all 0.2s;
+  min-width: 80px;
+}
+
+.helpline-call-btn:hover {
+  background: #dc2626;
+  transform: scale(1.05);
+}
+
+.call-icon {
+  font-size: 1.1rem;
+}
+
+.call-number {
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.helplines-loading, .helplines-error, .no-helplines {
+  text-align: center;
+  padding: 40px;
+  color: #64748b;
+}
+
+/* ─── Help History ────────────────────────────────── */
+.help-history-container {
+  padding: 20px;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.history-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 4px 0;
+}
+
+.history-subtitle {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin: 0 0 20px 0;
+}
+
+.history-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #94a3b8;
+}
+
+.empty-icon {
+  font-size: 3rem;
+  display: block;
+  margin-bottom: 12px;
+}
+
+.empty-sub {
+  font-size: 0.85rem;
+  margin-top: 4px;
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history-card {
+  background: white;
+  border-radius: 12px;
+  border: 1.5px solid #f1f5f9;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+}
+
+.history-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+
+.history-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+}
+
+.history-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.history-status-icon {
+  font-size: 1.4rem;
+}
+
+.history-type {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1e293b;
+  letter-spacing: 0.5px;
+}
+
+.history-date {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.history-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.history-status-badge {
+  padding: 4px 10px;
+  border-radius: 20px;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.history-chevron {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.history-card-body {
+  padding: 0 16px 16px;
+  border-top: 1px solid #f1f5f9;
+  animation: slide-down 0.2s ease;
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.history-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 12px 0;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detail-label {
+  font-size: 0.75rem;
+  color: #94a3b8;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #334155;
+}
+
+.detail-value.risk[data-score="8"],
+.detail-value.risk[data-score="9"],
+.detail-value.risk[data-score="10"] {
+  color: #ef4444;
+}
+
+.detail-location {
+  font-size: 0.85rem;
+  color: #475569;
+  padding: 8px 0 0;
+}
+
+.detail-description {
+  font-size: 0.85rem;
+  color: #475569;
+  font-style: italic;
+  padding: 4px 0 0;
+}
+
+.history-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding-top: 20px;
+}
+
+.page-btn {
+  padding: 8px 20px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.page-btn:disabled {
+  background: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.page-info {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.history-loading {
+  text-align: center;
+  padding: 40px;
+  color: #64748b;
+}

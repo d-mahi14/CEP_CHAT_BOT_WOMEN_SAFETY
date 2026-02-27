@@ -10,6 +10,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const sosRoutes = require('./routes/sos');
+const aiRoutes  = require('./routes/ai');
 require('dotenv').config();
 
 // Import routes
@@ -143,46 +145,52 @@ app.use((err, req, res, next) => {
   });
 });
 
+app.use('/api/sos', sosRoutes);
+app.use('/api/ai',  aiRoutes);
+
+
 // =====================================================
 // SERVER STARTUP
 // =====================================================
 
+// =====================================================
+// SERVER STARTUP
+// =====================================================
+
+let serverStarted = false;
+
 const startServer = async () => {
+  if (serverStarted) return; // prevents double start
+  serverStarted = true;
+
   try {
-    // Test Supabase connection
     console.log('🔄 Testing Supabase connection...');
+
     const connected = await testConnection();
-    
+
     if (!connected) {
-      console.error('❌ Failed to connect to Supabase. Please check your configuration.');
-      process.exit(1);
+      console.warn('⚠️ Supabase connection failed — starting server anyway');
+    } else {
+      console.log('✅ Supabase connected');
     }
 
-    // Start Express server
     app.listen(PORT, () => {
       console.log('');
       console.log('='.repeat(50));
-      console.log('🚀 Safety App Node.js Backend Server');
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
       console.log('='.repeat(50));
-      console.log(`📡 Server running on: http://localhost:${PORT}`);
-      console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`⏰ Started at: ${new Date().toLocaleString()}`);
-      console.log('='.repeat(50));
-      console.log('');
-      console.log('📋 Available endpoints:');
-      console.log(`   Health Check: http://localhost:${PORT}/health`);
-      console.log(`   API Root: http://localhost:${PORT}/`);
-      console.log('');
-      console.log('Press Ctrl+C to stop the server');
-      console.log('');
     });
 
   } catch (error) {
-    console.error('❌ Failed to start server:', error);
-    process.exit(1);
+    console.error('Startup error:', error);
+
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
+    });
   }
 };
 
+startServer();
 // Handle graceful shutdown
 process.on('SIGTERM', () => {
   console.log('⚠️  SIGTERM signal received: closing HTTP server');
