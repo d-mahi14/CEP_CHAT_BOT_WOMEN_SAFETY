@@ -8,7 +8,7 @@
 import axios from 'axios';
 import { getCurrentSession } from './supabaseClient';
 
-const NODE_API_URL = process.env.REACT_APP_NODE_API_URL || 'http://localhost:3001';
+const NODE_API_URL = process.env.REACT_APP_NODE_API_URL || 'http://localhost:5000';
 
 const getAuthHeaders = async () => {
   const session = await getCurrentSession();
