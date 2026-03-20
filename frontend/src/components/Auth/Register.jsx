@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authAPI } from '../../services/api';
+import { supabase } from '../../services/supabaseClient';
 import './Auth.css';
 
 /* ── Icons ────────────────────────────────────────── */
@@ -101,7 +102,7 @@ function PwStrength({ pw }) {
 export default function Register() {
   const navigate = useNavigate();
 
-  const [step, setStep] = useState(1); // 1 = account, 2 = contacts
+  const [step, setStep] = useState(1);
   const [showPw, setShowPw]     = useState(false);
   const [showCpw, setShowCpw]   = useState(false);
   const [loading, setLoading]   = useState(false);
@@ -129,10 +130,12 @@ export default function Register() {
   /* Step 1 → Step 2 validation */
   const goStep2 = (e) => {
     e.preventDefault();
-    if (!form.full_name.trim())         { setError('Please enter your full name.'); return; }
-    if (!form.email.trim())             { setError('Please enter your email.'); return; }
-    if (!form.phone.trim())             { setError('Please enter your phone number.'); return; }
-    if (form.password.length < 8)       { setError('Password must be at least 8 characters.'); return; }
+    if (!form.full_name.trim())            { setError('Please enter your full name.'); return; }
+    if (!form.email.trim())                { setError('Please enter your email.'); return; }
+    if (!form.phone.trim())                { setError('Please enter your phone number.'); return; }
+    if (form.password.length < 8)          { setError('Password must be at least 8 characters.'); return; }
+    if (!/[A-Z]/.test(form.password))      { setError('Password must contain at least one uppercase letter.'); return; }
+    if (!/\d/.test(form.password))         { setError('Password must contain at least one number.'); return; }
     if (form.password !== form.confirm_pw) { setError('Passwords do not match.'); return; }
     setError('');
     setStep(2);
@@ -149,20 +152,39 @@ export default function Register() {
     setLoading(true);
     setError('');
     try {
+      // FIX: Step 1 — create the Supabase Auth user directly so the session
+      // is persisted to localStorage by the Supabase JS client.
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email:    form.email.trim(),
+        password: form.password,
+        options:  { data: { full_name: form.full_name.trim() } },
+      });
+
+      if (signUpError) {
+        setError(signUpError.message || 'Registration failed. Try again.');
+        return;
+      }
+
+      // FIX: Step 2 — call our Node backend to save the profile, phone, and
+      // emergency contacts. The backend uses the service-role key so it can
+      // insert rows regardless of RLS. We pass the same payload as before.
       const contacts = [
         { name: form.contact1_name, phone: form.contact1_phone, priority: 1 },
         ...(form.contact2_name && form.contact2_phone
           ? [{ name: form.contact2_name, phone: form.contact2_phone, priority: 2 }]
           : []),
       ];
+
       await authAPI.register({
-        full_name:         form.full_name.trim(),
-        email:             form.email.trim(),
-        phone:             form.phone.trim(),
-        password:          form.password,
+        full_name:          form.full_name.trim(),
+        email:              form.email.trim(),
+        phone:              form.phone.trim(),
+        password:           form.password,       // backend re-uses for signUp if needed
         emergency_contacts: contacts,
         preferred_language: form.language,
       });
+
+      // Session already stored by supabase.auth.signUp() above — navigate directly.
       navigate('/dashboard');
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Registration failed. Try again.');
@@ -218,9 +240,9 @@ export default function Register() {
 
         <div className="auth-features">
           {[
-            { icon: '📱', title: 'Emergency Contacts',    desc: 'Notified instantly when you trigger SOS'    },
-            { icon: '🗺️', title: 'Live Location Share',  desc: 'Contacts see exactly where you are'          },
-            { icon: '🌐', title: '10 Indian Languages',   desc: 'AI responds in your native language'         },
+            { icon: '📱', title: 'Emergency Contacts',   desc: 'Notified instantly when you trigger SOS'    },
+            { icon: '🗺️', title: 'Live Location Share', desc: 'Contacts see exactly where you are'          },
+            { icon: '🌐', title: '10 Indian Languages',  desc: 'AI responds in your native language'         },
           ].map(f => (
             <div className="auth-feature" key={f.title}>
               <div className="auth-feature-icon">{f.icon}</div>
@@ -331,8 +353,8 @@ export default function Register() {
                 <div className="auth-input-wrap">
                   <span className="auth-input-icon"><I.lock /></span>
                   <input id="password" type={showPw ? 'text' : 'password'} className="auth-input"
-                    placeholder="Min. 8 characters" value={form.password} onChange={set('password')}
-                    autoComplete="new-password" />
+                    placeholder="Min. 8 chars, 1 uppercase, 1 number" value={form.password}
+                    onChange={set('password')} autoComplete="new-password" />
                   <button type="button" className="auth-pw-toggle" onClick={() => setShowPw(p => !p)}
                     tabIndex={-1} aria-label="Toggle password visibility">
                     <I.eye off={showPw} />

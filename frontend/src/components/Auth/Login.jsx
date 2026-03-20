@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { authAPI } from '../../services/api';
+import { supabase } from '../../services/supabaseClient';
 import './Auth.css';
 
 /* ── SVG icons (inline, no dependency) ───────────── */
@@ -68,10 +69,30 @@ export default function Login() {
     setLoading(true);
     setError('');
     try {
-      await authAPI.login({ email: form.email.trim(), password: form.password });
+      // FIX: Use Supabase directly so the session is persisted to localStorage
+      // authAPI.login() calls the Node backend which validates but doesn't
+      // persist the session on the frontend. We use Supabase client directly.
+      const { data, error: supabaseError } = await supabase.auth.signInWithPassword({
+        email: form.email.trim(),
+        password: form.password,
+      });
+
+      if (supabaseError) {
+        setError(supabaseError.message || 'Invalid email or password.');
+        return;
+      }
+
+      // Session is now persisted in localStorage by the Supabase client.
+      // Optionally also call the Node backend to log the event / update last_login:
+      try {
+        await authAPI.login({ email: form.email.trim(), password: form.password });
+      } catch (_) {
+        // Non-critical — navigation still proceeds
+      }
+
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.error || err.message || 'Login failed. Check your credentials.');
+      setError(err.message || 'Login failed. Check your credentials.');
     } finally {
       setLoading(false);
     }

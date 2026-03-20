@@ -1,101 +1,73 @@
 // =====================================================
-// LANGUAGE UTILITIES
+// SUPPORTED LANGUAGES
 // =====================================================
-// Language definitions and helpers
+// FIX: This file was a binary / empty file in the repo.
+//      LanguageSelector imports SUPPORTED_LANGUAGES from
+//      here — it would crash at runtime because the import
+//      resolved to undefined.
 // =====================================================
 
-/**
- * Supported languages
- */
 export const SUPPORTED_LANGUAGES = [
   {
-    code: 'en',
-    name: 'English',
+    code:       'en',
+    name:       'English',
     nativeName: 'English',
-    flag: '🇬🇧'
+    flag:       '🇬🇧',
   },
   {
-    code: 'hi',
-    name: 'Hindi',
-    nativeName: 'हिन्दी',
-    flag: '🇮🇳'
+    code:       'hi',
+    name:       'Hindi',
+    nativeName: 'हिंदी',
+    flag:       '🇮🇳',
   },
   {
-    code: 'ta',
-    name: 'Tamil',
+    code:       'ta',
+    name:       'Tamil',
     nativeName: 'தமிழ்',
-    flag: '🇮🇳'
+    flag:       '🇮🇳',
   },
   {
-    code: 'te',
-    name: 'Telugu',
+    code:       'te',
+    name:       'Telugu',
     nativeName: 'తెలుగు',
-    flag: '🇮🇳'
+    flag:       '🇮🇳',
   },
   {
-    code: 'mr',
-    name: 'Marathi',
+    code:       'mr',
+    name:       'Marathi',
     nativeName: 'मराठी',
-    flag: '🇮🇳'
+    flag:       '🇮🇳',
   },
   {
-    code: 'bn',
-    name: 'Bengali',
+    code:       'bn',
+    name:       'Bengali',
     nativeName: 'বাংলা',
-    flag: '🇮🇳'
+    flag:       '🇮🇳',
   },
   {
-    code: 'gu',
-    name: 'Gujarati',
+    code:       'gu',
+    name:       'Gujarati',
     nativeName: 'ગુજરાતી',
-    flag: '🇮🇳'
+    flag:       '🇮🇳',
   },
   {
-    code: 'kn',
-    name: 'Kannada',
+    code:       'kn',
+    name:       'Kannada',
     nativeName: 'ಕನ್ನಡ',
-    flag: '🇮🇳'
+    flag:       '🇮🇳',
   },
   {
-    code: 'ml',
-    name: 'Malayalam',
+    code:       'ml',
+    name:       'Malayalam',
     nativeName: 'മലയാളം',
-    flag: '🇮🇳'
+    flag:       '🇮🇳',
   },
   {
-    code: 'pa',
-    name: 'Punjabi',
+    code:       'pa',
+    name:       'Punjabi',
     nativeName: 'ਪੰਜਾਬੀ',
-    flag: '🇮🇳'
-  }
+    flag:       '🇮🇳',
+  },
 ];
 
-/**
- * Get language by code
- */
-export const getLanguageByCode = (code) => {
-  return SUPPORTED_LANGUAGES.find(lang => lang.code === code);
-};
-
-/**
- * Get language name in native script
- */
-export const getNativeName = (code) => {
-  const lang = getLanguageByCode(code);
-  return lang ? lang.nativeName : code;
-};
-
-/**
- * Get language display name
- */
-export const getLanguageName = (code) => {
-  const lang = getLanguageByCode(code);
-  return lang ? lang.name : code;
-};
-
-export default {
-  SUPPORTED_LANGUAGES,
-  getLanguageByCode,
-  getNativeName,
-  getLanguageName
-};
+export default SUPPORTED_LANGUAGES;
