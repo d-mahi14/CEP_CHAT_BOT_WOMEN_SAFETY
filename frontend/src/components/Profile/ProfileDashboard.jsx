@@ -1,23 +1,11 @@
 // =====================================================
-// ProfileDashboard.jsx — PHONE FIELD ADDED
+// ProfileDashboard.jsx — FULL i18n + Last Login fix
 // =====================================================
-// FIX: Profile edit form now includes a Phone Number
-//   input field. The value is pre-filled from the
-//   decrypted phoneNumber returned by GET /api/profile.
-//   On save, phoneNumber is sent to PUT /api/profile
-//   where the backend encrypts it before storing.
-//
-// This resolves: "null value in column
-//   phone_number_encrypted of relation users violates
-//   not-null constraint" — which occurred because the
-//   upsert tried to INSERT a new users row without the
-//   required phone fields.
-// =====================================================
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { signOut, getCurrentUser, supabase } from '../../services/supabaseClient';
 import { profileAPI } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 import EmergencyContacts from './EmergencyContacts';
 import LanguageSelector from './LanguageSelector';
 import SOSButton from '../SOS/SOSButton';
@@ -27,20 +15,9 @@ import AIChat from '../AI/AIChat';
 import '../SOS/SOS.css';
 import './Dashboard.css';
 
-const TABS = [
-  { key: 'sos',       label: 'SOS',       icon: '🆘', desc: 'Emergency'  },
-  { key: 'ai',        label: 'AI Help',   icon: '🤖', desc: 'Assistant'  },
-  { key: 'contacts',  label: 'Contacts',  icon: '📞', desc: 'Emergency'  },
-  { key: 'helplines', label: 'Helplines', icon: '☎️', desc: 'Numbers'    },
-  { key: 'history',   label: 'History',   icon: '📋', desc: 'Past SOS'   },
-  { key: 'language',  label: 'Language',  icon: '🌐', desc: 'Settings'   },
-  { key: 'profile',   label: 'Profile',   icon: '👤', desc: 'Account'    },
-];
-
 const GENDERS      = ['', 'Female', 'Male', 'Non-binary', 'Prefer not to say'];
 const BLOOD_GROUPS = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
-/* ── Avatar upload ─────────────────────────────────── */
 async function uploadAvatarToStorage(userId, file) {
   const ext  = file.name.split('.').pop().toLowerCase() || 'jpg';
   const path = `${userId}/avatar.${ext}`;
@@ -52,10 +29,43 @@ async function uploadAvatarToStorage(userId, file) {
   return `${data.publicUrl}?v=${Date.now()}`;
 }
 
+function formatDateTime(iso) {
+  if (!iso) return null;
+  try {
+    return new Date(iso).toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit',
+    });
+  } catch { return null; }
+}
+
+// ── Previous Login helpers ─────────────────────────
+// We store the PREVIOUS session's timestamp in localStorage.
+// On each load we show what was stored, then update the store
+// with the current session time so next visit shows this one.
+const PREV_LOGIN_KEY = 'safeguard_prev_login';
+
+function resolveAndRotatePreviousLogin(supabaseUser) {
+  const currentSessionTime = supabaseUser?.last_sign_in_at;
+  const stored = localStorage.getItem(PREV_LOGIN_KEY);
+
+  // Update store for next session
+  if (currentSessionTime) {
+    localStorage.setItem(PREV_LOGIN_KEY, currentSessionTime);
+  }
+
+  // Return the PREVIOUS value (what was stored before this load)
+  // If stored === currentSessionTime it's the same session (page refresh),
+  // so show nothing meaningful yet.
+  if (!stored || stored === currentSessionTime) return null;
+  return stored;
+}
+
 /* ══════════════════════════════════════════════════
    ProfileEditor
    ══════════════════════════════════════════════════ */
-const ProfileEditor = ({ userObj, profileObj, userEmail, onSaved }) => {
+const ProfileEditor = ({ userObj, profileObj, userEmail, previousLoginTime, onSaved }) => {
+  const { t } = useLanguage();
   const fileInputRef = useRef(null);
 
   const [editing,       setEditing]       = useState(false);
@@ -66,28 +76,21 @@ const ProfileEditor = ({ userObj, profileObj, userEmail, onSaved }) => {
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [avatarFile,    setAvatarFile]    = useState(null);
 
-  useEffect(() => {
-    setAvatarPreview(profileObj?.avatar_url || null);
-  }, [profileObj?.avatar_url]);
+  useEffect(() => { setAvatarPreview(profileObj?.avatar_url || null); }, [profileObj?.avatar_url]);
 
-  /* Build form from current server data */
   const makeForm = () => ({
-    fullName:    userObj?.fullName              || '',
-    phoneNumber: userObj?.phoneNumber          || '',   // ← pre-fill decrypted phone
+    fullName:    userObj?.fullName    || '',
+    phoneNumber: userObj?.phoneNumber || '',
     bio:         profileObj?.bio               || '',
     location:    profileObj?.location          || '',
     gender:      profileObj?.gender            || '',
     bloodGroup:  profileObj?.blood_group       || '',
     dateOfBirth: profileObj?.date_of_birth
-      ? String(profileObj.date_of_birth).slice(0, 10)
-      : '',
+      ? String(profileObj.date_of_birth).slice(0, 10) : '',
   });
 
   const [form, setForm] = useState(makeForm);
-
-  useEffect(() => {
-    setForm(makeForm());
-  }, [
+  useEffect(() => { setForm(makeForm()); }, [
     userObj?.fullName, userObj?.phoneNumber,
     profileObj?.bio, profileObj?.location, profileObj?.gender,
     profileObj?.blood_group, profileObj?.date_of_birth,
@@ -95,11 +98,10 @@ const ProfileEditor = ({ userObj, profileObj, userEmail, onSaved }) => {
 
   const setF = k => e => { setForm(f => ({ ...f, [k]: e.target.value })); setError(''); };
 
-  /* Avatar file picker */
   const handleFileChange = e => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024)      { setError('Image must be smaller than 5 MB.'); return; }
+    if (file.size > 5 * 1024 * 1024) { setError('Image must be smaller than 5 MB.'); return; }
     if (!['image/jpeg','image/png','image/webp'].includes(file.type)) {
       setError('Only JPG, PNG, or WebP images are allowed.'); return;
     }
@@ -108,60 +110,47 @@ const ProfileEditor = ({ userObj, profileObj, userEmail, onSaved }) => {
     setError('');
   };
 
-  /* Save handler */
   const handleSave = async e => {
     e.preventDefault();
-    if (!form.fullName.trim()) { setError('Full name is required.'); return; }
-
+    if (!form.fullName.trim()) { setError(t('name_required')); return; }
     setSaving(true); setError(''); setSuccess('');
     try {
       let avatarUrl;
-
       if (avatarFile) {
         setUploading(true);
         try {
-          const uid = userObj?.id || userEmail || 'user';
-          avatarUrl = await uploadAvatarToStorage(uid, avatarFile);
-        } catch (upErr) {
-          setError(upErr.message); setSaving(false); setUploading(false); return;
-        }
+          avatarUrl = await uploadAvatarToStorage(userObj?.id || userEmail || 'user', avatarFile);
+        } catch (upErr) { setError(upErr.message); setSaving(false); setUploading(false); return; }
         setUploading(false);
         setAvatarFile(null);
       }
-
       await profileAPI.updateProfile({
-        fullName:    form.fullName.trim(),
-        phoneNumber: form.phoneNumber.trim(),   // ← always send, backend handles empty
-        bio:         form.bio,
-        location:    form.location,
-        gender:      form.gender,
-        bloodGroup:  form.bloodGroup,
-        dateOfBirth: form.dateOfBirth || null,
+        fullName: form.fullName.trim(), phoneNumber: form.phoneNumber.trim(),
+        bio: form.bio, location: form.location, gender: form.gender,
+        bloodGroup: form.bloodGroup, dateOfBirth: form.dateOfBirth || null,
         ...(avatarUrl !== undefined && { avatarUrl }),
       });
-
-      setSuccess('Profile updated successfully!');
+      setSuccess(t('profile_saved'));
       setEditing(false);
       onSaved?.();
       setTimeout(() => setSuccess(''), 4000);
     } catch (err) {
       setError(err?.response?.data?.error || 'Update failed. Please try again.');
-    } finally {
-      setSaving(false);
-    }
+    } finally { setSaving(false); }
   };
 
   const initials = (userObj?.fullName || userEmail || 'U').charAt(0).toUpperCase();
 
+  const lastLoginDisplay =
+    formatDateTime(previousLoginTime) ||
+    '—';
+
   return (
     <div className="pe-wrap">
-
-      {/* Hero */}
       <div className="pe-hero">
         <div
           className={`pe-avatar-ring ${editing ? 'pe-avatar-editable' : ''}`}
           onClick={editing ? () => fileInputRef.current?.click() : undefined}
-          title={editing ? 'Click to change photo' : ''}
         >
           {avatarPreview
             ? <img src={avatarPreview} alt="Profile" className="pe-avatar-img" />
@@ -178,127 +167,98 @@ const ProfileEditor = ({ userObj, profileObj, userEmail, onSaved }) => {
 
         <div className="pe-hero-info">
           <h2 className="pe-name">
-            {userObj?.fullName || <span style={{ color: '#64748b', fontWeight: 400 }}>Name not set — click Edit</span>}
+            {userObj?.fullName || <span style={{ color:'#64748b', fontWeight:400 }}>{t('not_set')}</span>}
           </h2>
           <p className="pe-email">{userEmail}</p>
           <span className="pe-since">
-            Member since{' '}
+            {t('member_since')}{' '}
             {userObj?.createdAt
-              ? new Date(userObj.createdAt).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+              ? new Date(userObj.createdAt).toLocaleDateString('en-IN', { month:'long', year:'numeric' })
               : '—'}
           </span>
-          {editing && <p className="pe-hint">Click avatar to change photo (JPG / PNG / WebP · max 5 MB)</p>}
+          {editing && <p className="pe-hint">{t('click_photo')}</p>}
         </div>
 
         <button className="pe-toggle" onClick={() => {
           setEditing(v => !v); setError(''); setSuccess('');
           if (!editing) setForm(makeForm());
         }}>
-          {editing ? '✕ Cancel' : '✏️ Edit Profile'}
+          {editing ? `✕ ${t('profile_cancel')}` : `✏️ ${t('profile_edit')}`}
         </button>
       </div>
 
       {success && <div className="pe-success">✅ {success}</div>}
       {error   && <div className="pe-error">⚠️ {error}</div>}
 
-      {/* ── Edit Form ── */}
       {editing ? (
         <form className="pe-form" onSubmit={handleSave} noValidate>
           <div className="pe-grid">
-
-            {/* Full Name */}
             <div className="pe-field">
-              <label className="pe-lbl">Full Name *</label>
+              <label className="pe-lbl">{t('full_name')} *</label>
               <input className="pe-inp" type="text" value={form.fullName}
-                onChange={setF('fullName')} placeholder="Your full name" />
+                onChange={setF('fullName')} placeholder={t('full_name')} />
             </div>
-
-            {/* Phone Number — NEW FIELD */}
             <div className="pe-field">
-              <label className="pe-lbl">Phone Number</label>
+              <label className="pe-lbl">{t('phone')}</label>
               <div className="pe-input-icon-wrap">
                 <span className="pe-input-prefix">📱</span>
-                <input
-                  className="pe-inp pe-inp-icon"
-                  type="tel"
-                  inputMode="tel"
-                  value={form.phoneNumber}
-                  onChange={setF('phoneNumber')}
-                  placeholder="+91 98765 43210"
-                  autoComplete="tel"
-                />
+                <input className="pe-inp pe-inp-icon" type="tel" inputMode="tel"
+                  value={form.phoneNumber} onChange={setF('phoneNumber')}
+                  placeholder="+91 98765 43210" autoComplete="tel" />
               </div>
             </div>
-
-            {/* Location */}
             <div className="pe-field">
-              <label className="pe-lbl">Location</label>
+              <label className="pe-lbl">{t('location')}</label>
               <input className="pe-inp" type="text" value={form.location}
-                onChange={setF('location')} placeholder="e.g. Mumbai, Maharashtra" />
+                onChange={setF('location')} placeholder="e.g. Mumbai" />
             </div>
-
-            {/* Gender */}
             <div className="pe-field">
-              <label className="pe-lbl">Gender</label>
+              <label className="pe-lbl">{t('gender')}</label>
               <select className="pe-inp" value={form.gender} onChange={setF('gender')}>
-                {GENDERS.map(g => <option key={g} value={g}>{g || 'Select…'}</option>)}
+                {GENDERS.map(g => <option key={g} value={g}>{g || t('gender_select')}</option>)}
               </select>
             </div>
-
-            {/* Date of Birth */}
             <div className="pe-field">
-              <label className="pe-lbl">Date of Birth</label>
-              <input className="pe-inp" type="date" value={form.dateOfBirth}
-                onChange={setF('dateOfBirth')} />
+              <label className="pe-lbl">{t('dob')}</label>
+              <input className="pe-inp" type="date" value={form.dateOfBirth} onChange={setF('dateOfBirth')} />
             </div>
-
-            {/* Blood Group */}
             <div className="pe-field">
-              <label className="pe-lbl">Blood Group</label>
+              <label className="pe-lbl">{t('blood_group')}</label>
               <select className="pe-inp" value={form.bloodGroup} onChange={setF('bloodGroup')}>
-                {BLOOD_GROUPS.map(b => <option key={b} value={b}>{b || 'Select…'}</option>)}
+                {BLOOD_GROUPS.map(b => <option key={b} value={b}>{b || t('gender_select')}</option>)}
               </select>
             </div>
-
           </div>
-
-          {/* Bio — full width */}
-          <div className="pe-field" style={{ marginTop: 14 }}>
-            <label className="pe-lbl">Bio</label>
+          <div className="pe-field" style={{ marginTop:14 }}>
+            <label className="pe-lbl">{t('bio')}</label>
             <textarea className="pe-inp pe-ta" rows={3} value={form.bio}
-              onChange={setF('bio')} placeholder="A short description about yourself…" />
+              onChange={setF('bio')} placeholder="…" />
           </div>
-
           <div className="pe-actions">
-            <button type="button" className="pe-cancel"
-              onClick={() => { setEditing(false); setError(''); }}>
-              Cancel
+            <button type="button" className="pe-cancel" onClick={() => { setEditing(false); setError(''); }}>
+              {t('profile_cancel')}
             </button>
             <button type="submit" className="pe-save" disabled={saving}>
               {saving
-                ? <><span className="pe-spin" /> {uploading ? 'Uploading photo…' : 'Saving…'}</>
-                : '✓ Save Changes'}
+                ? <><span className="pe-spin" /> {uploading ? t('profile_uploading') : t('profile_saving')}</>
+                : `✓ ${t('profile_save')}`}
             </button>
           </div>
         </form>
       ) : (
-        /* ── Read-only grid ── */
         <div className="pe-grid-info">
           {[
-            { icon: '👤', label: 'Full Name',    value: userObj?.fullName          || 'Not set — click Edit' },
-            { icon: '📧', label: 'Email',         value: userEmail                  || '—' },
-            { icon: '📱', label: 'Phone',         value: userObj?.phoneNumber       || 'Not set — click Edit' },
-            { icon: '📍', label: 'Location',      value: profileObj?.location       || '—' },
-            { icon: '🪪', label: 'Gender',        value: profileObj?.gender         || '—' },
-            { icon: '🎂', label: 'Date of Birth', value: profileObj?.date_of_birth
-                ? new Date(profileObj.date_of_birth).toLocaleDateString('en-IN')
-                : '—' },
-            { icon: '🩸', label: 'Blood Group',   value: profileObj?.blood_group    || '—' },
-            { icon: '📝', label: 'Bio',           value: profileObj?.bio            || '—' },
-            { icon: '🕐', label: 'Last Login',    value: userObj?.lastLogin
-                ? new Date(userObj.lastLogin).toLocaleString('en-IN')
-                : '—' },
-            { icon: '🔒', label: 'Status',        value: (userObj?.isActive ?? true) ? 'Active ✅' : 'Inactive' },
+            { icon:'👤', label:t('full_name'),    value: userObj?.fullName    || t('not_set') },
+            { icon:'📧', label:t('email'),         value: userEmail            || '—' },
+            { icon:'📱', label:t('phone'),         value: userObj?.phoneNumber || t('not_set') },
+            { icon:'📍', label:t('location'),      value: profileObj?.location || '—' },
+            { icon:'🪪', label:t('gender'),        value: profileObj?.gender   || '—' },
+            { icon:'🎂', label:t('dob'),           value: profileObj?.date_of_birth
+                ? new Date(profileObj.date_of_birth).toLocaleDateString('en-IN') : '—' },
+            { icon:'🩸', label:t('blood_group'),   value: profileObj?.blood_group || '—' },
+            { icon:'📝', label:t('bio'),           value: profileObj?.bio         || '—' },
+            { icon:'🕐', label:t('last_login'),    value: lastLoginDisplay },
+            { icon:'🔒', label:t('status'),        value: (userObj?.isActive ?? true) ? t('active') : 'Inactive' },
           ].map(item => (
             <div className="pe-card" key={item.label}>
               <span className="pe-card-icon">{item.icon}</span>
@@ -316,8 +276,8 @@ const ProfileEditor = ({ userObj, profileObj, userEmail, onSaved }) => {
         .pe-hero{display:flex;align-items:center;gap:18px;padding:22px;background:#131929;border:1px solid rgba(255,255,255,.07);border-radius:16px;margin-bottom:18px;flex-wrap:wrap}
         .pe-avatar-ring{position:relative;flex-shrink:0;width:72px;height:72px;border-radius:50%}
         .pe-avatar-editable{cursor:pointer}
-        .pe-avatar-img{width:72px;height:72px;border-radius:50%;object-fit:cover;border:2.5px solid rgba(230,57,70,.5);box-shadow:0 0 18px rgba(230,57,70,.3);display:block}
-        .pe-avatar-letters{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#E63946,#a8202a);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:1.8rem;color:#fff;box-shadow:0 0 22px rgba(230,57,70,.35)}
+        .pe-avatar-img{width:72px;height:72px;border-radius:50%;object-fit:cover;border:2.5px solid rgba(230,57,70,.5);display:block}
+        .pe-avatar-letters{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#E63946,#a8202a);display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;font-size:1.8rem;color:#fff}
         .pe-avatar-overlay{position:absolute;inset:0;border-radius:50%;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;font-size:1.4rem;opacity:0;transition:opacity .2s}
         .pe-avatar-editable:hover .pe-avatar-overlay{opacity:1}
         .pe-hero-info{flex:1;min-width:0}
@@ -343,9 +303,9 @@ const ProfileEditor = ({ userObj, profileObj, userEmail, onSaved }) => {
         .pe-input-prefix{position:absolute;left:12px;font-size:.95rem;pointer-events:none;z-index:1}
         .pe-inp-icon{padding-left:36px}
         .pe-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
-        .pe-cancel{padding:9px 16px;background:#1E2740;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#CBD5E4;font-size:.86rem;cursor:pointer;font-family:inherit;transition:background .2s}
+        .pe-cancel{padding:9px 16px;background:#1E2740;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#CBD5E4;font-size:.86rem;cursor:pointer;font-family:inherit}
         .pe-cancel:hover{background:#253050}
-        .pe-save{display:flex;align-items:center;gap:7px;padding:9px 20px;background:#E63946;border:none;border-radius:8px;color:#fff;font-size:.88rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:inherit}
+        .pe-save{display:flex;align-items:center;gap:7px;padding:9px 20px;background:#E63946;border:none;border-radius:8px;color:#fff;font-size:.88rem;font-weight:600;cursor:pointer;font-family:inherit}
         .pe-save:hover:not(:disabled){background:#c8303c}
         .pe-save:disabled{opacity:.6;cursor:not-allowed}
         .pe-spin{width:13px;height:13px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:pe-sp .7s linear infinite;display:inline-block}
@@ -369,14 +329,27 @@ const ProfileEditor = ({ userObj, profileObj, userEmail, onSaved }) => {
    ══════════════════════════════════════════════════ */
 const ProfileDashboard = () => {
   const navigate = useNavigate();
-  const [user,        setUser]        = useState(null);
-  const [profile,     setProfile]     = useState({});
-  const [profileData, setProfileData] = useState({});
-  const [preferences, setPreferences] = useState({});
-  const [loading,     setLoading]     = useState(true);
-  const [activeTab,   setActiveTab]   = useState('sos');
-  const [sosActive,   setSosActive]   = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { languageCode, languageName, setLanguage, t } = useLanguage();
+
+  const [user,             setUser]             = useState(null);
+  const [profile,          setProfile]          = useState({});
+  const [profileData,      setProfileData]      = useState({});
+  const [preferences,      setPreferences]      = useState({});
+  const [loading,          setLoading]          = useState(true);
+  const [activeTab,        setActiveTab]        = useState('sos');
+  const [sosActive,        setSosActive]        = useState(false);
+  const [sidebarOpen,      setSidebarOpen]      = useState(false);
+  const [previousLoginTime,setPreviousLoginTime]= useState(null);
+
+  const TABS = [
+    { key:'sos',       label:t('nav_sos'),       icon:'🆘', desc:t('nav_sos_desc')       },
+    { key:'ai',        label:t('nav_ai'),         icon:'🤖', desc:t('nav_ai_desc')        },
+    { key:'contacts',  label:t('nav_contacts'),   icon:'📞', desc:t('nav_contacts_desc')  },
+    { key:'helplines', label:t('nav_helplines'),  icon:'☎️', desc:t('nav_helplines_desc') },
+    { key:'history',   label:t('nav_history'),    icon:'📋', desc:t('nav_history_desc')   },
+    { key:'language',  label:t('nav_language'),   icon:'🌐', desc:t('nav_language_desc')  },
+    { key:'profile',   label:t('nav_profile'),    icon:'👤', desc:t('nav_profile_desc')   },
+  ];
 
   useEffect(() => { loadProfile(); }, []);
 
@@ -385,11 +358,20 @@ const ProfileDashboard = () => {
       setLoading(true);
       const currentUser = await getCurrentUser();
       setUser(currentUser);
+
+      // Resolve previous login time
+      const prev = resolveAndRotatePreviousLogin(currentUser);
+      setPreviousLoginTime(prev);
+
       const response = await profileAPI.getProfile();
       if (response.success) {
         setProfile(response.data.user        || {});
         setProfileData(response.data.profile || {});
-        setPreferences(response.data.preferences || {});
+        const prefs = response.data.preferences || {};
+        setPreferences(prefs);
+        if (prefs.language_code && prefs.language_code !== languageCode) {
+          setLanguage(prefs.language_code, prefs.language_name);
+        }
       }
     } catch (err) {
       console.error('Profile load error:', err);
@@ -410,19 +392,17 @@ const ProfileDashboard = () => {
       <div className="db-loading">
         <span className="db-spinner" />
         <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-        <span>Loading your safety profile…</span>
+        <span>Loading…</span>
       </div>
     );
   }
 
-  const firstName   = (profile.fullName || user?.email || 'U').split(' ')[0];
-  const avatarUrl   = profileData?.avatar_url || null;
-  const activeInfo  = TABS.find(t => t.key === activeTab);
+  const firstName  = (profile.fullName || user?.email || 'U').split(' ')[0];
+  const avatarUrl  = profileData?.avatar_url || null;
+  const activeInfo = TABS.find(tab => tab.key === activeTab);
 
   return (
     <div className={`db-root ${sosActive ? 'sos-mode' : ''}`}>
-
-      {/* Sidebar */}
       <aside className={`db-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="db-logo">
           <div className="db-logo-shield">
@@ -458,27 +438,26 @@ const ProfileDashboard = () => {
                 <span className="db-nav-label">{tab.label}</span>
                 <span className="db-nav-desc">{tab.desc}</span>
               </div>
-              {tab.key === 'sos' && sosActive && <span className="db-nav-badge">LIVE</span>}
+              {tab.key === 'sos' && sosActive && <span className="db-nav-badge">{t('sos_active')}</span>}
             </button>
           ))}
         </nav>
 
         <div className="db-sidebar-footer">
-          <span className="db-lang-badge">🌐 {preferences.language_name || 'English'}</span>
+          <span className="db-lang-badge">🌐 {languageName || 'English'}</span>
           <button className="db-logout-btn" onClick={handleLogout}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
               <polyline points="16 17 21 12 16 7"/>
               <line x1="21" y1="12" x2="9" y2="12"/>
             </svg>
-            Logout
+            {t('logout')}
           </button>
         </div>
       </aside>
 
       {sidebarOpen && <div className="db-overlay" onClick={() => setSidebarOpen(false)} />}
 
-      {/* Main */}
       <main className="db-main">
         <header className={`db-topbar ${sosActive ? 'topbar-sos' : ''}`}>
           <button className="db-hamburger" onClick={() => setSidebarOpen(s => !s)}>
@@ -493,7 +472,9 @@ const ProfileDashboard = () => {
           </div>
           <div className="db-topbar-right">
             {sosActive && (
-              <div className="db-sos-live-badge"><span className="live-dot" />SOS ACTIVE</div>
+              <div className="db-sos-live-badge">
+                <span className="live-dot" />{t('sos_active')}
+              </div>
             )}
             <div className="db-topbar-avatar">
               {avatarUrl
@@ -508,11 +489,11 @@ const ProfileDashboard = () => {
         {activeTab === 'sos' && !sosActive && (
           <div className="db-welcome-banner">
             <div className="db-welcome-text">
-              <h3>Welcome back, {firstName} 👋</h3>
-              <p>Your safety profile is active · {preferences.language_name || 'English'}</p>
+              <h3>{t('welcome_back')}, {firstName} 👋</h3>
+              <p>{t('safety_active')} · {languageName || 'English'}</p>
             </div>
             <div className="db-welcome-stats">
-              <div className="db-stat-chip"><span>112</span><small>Emergency</small></div>
+              <div className="db-stat-chip"><span>112</span><small>{t('nav_sos_desc')}</small></div>
               <div className="db-stat-chip"><span>1091</span><small>Women's Help</small></div>
             </div>
           </div>
@@ -530,7 +511,7 @@ const ProfileDashboard = () => {
           {activeTab === 'ai' && (
             <div className="db-ai-wrapper">
               <AIChat
-                userLanguage={preferences.language_code || 'en'}
+                userLanguage={languageCode}
                 onEmergencyDetected={d => { if (d?.auto_sos_triggered) setSosActive(true); }}
               />
             </div>
@@ -539,16 +520,14 @@ const ProfileDashboard = () => {
           {activeTab === 'helplines' && <Helplines />}
           {activeTab === 'history'   && <HelpHistory />}
           {activeTab === 'language'  && (
-            <LanguageSelector
-              currentLanguage={preferences.language_code || 'en'}
-              onLanguageChange={loadProfile}
-            />
+            <LanguageSelector currentLanguage={languageCode} onLanguageChange={loadProfile} />
           )}
           {activeTab === 'profile' && (
             <ProfileEditor
               userObj={profile}
               profileObj={profileData}
               userEmail={user?.email}
+              previousLoginTime={previousLoginTime}
               onSaved={loadProfile}
             />
           )}
