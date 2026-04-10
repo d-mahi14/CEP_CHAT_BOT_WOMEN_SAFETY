@@ -26,7 +26,7 @@ const profileRoutes = require('./routes/profile');
 const emergencyRoutes = require('./routes/emergency');
 const sosRoutes = require('./routes/sos');   // FIX: was added after 404 handler
 const aiRoutes  = require('./routes/ai');    // FIX: was added after 404 handler
-
+const legalRoutes = require('./routes/legal');
 // Import config
 const { testConnection } = require('./config/supabase');
 
@@ -50,7 +50,7 @@ app.use(cors(corsOptions));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
+app.use('/api/legal', legalRoutes);
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,

@@ -120,6 +120,10 @@ export const translations = {
     hh_next:       'Next →',
     hh_page:       'Page',
     hh_of:         'of',
+    nav_legal:          'Legal Help',
+    nav_legal_desc:     'Rights & FIR',
+    nav_analytics:      'Analytics',
+    nav_analytics_desc: 'Reports',
   },
 
   hi: {
@@ -239,6 +243,10 @@ export const translations = {
     hh_next:       'अगला →',
     hh_page:       'पृष्ठ',
     hh_of:         'का',
+    nav_legal:          'कानूनी सहायता',
+    nav_legal_desc:     'अधिकार और FIR',
+    nav_analytics:      'विश्लेषण',
+    nav_analytics_desc: 'रिपोर्ट्स',
   },
 
   ta: {
@@ -308,6 +316,10 @@ export const translations = {
     hh_risk: 'ஆபத்து மதிப்பெண்', hh_duration: 'காலம்', hh_notif: 'அறிவிப்புகள்',
     hh_sent: 'அனுப்பப்பட்டன', hh_ongoing: 'நடந்து கொண்டிருக்கிறது',
     hh_prev: '← முந்தைய', hh_next: 'அடுத்து →', hh_page: 'பக்கம்', hh_of: 'இல்',
+    nav_legal:          'சட்ட உதவி',
+    nav_legal_desc:     'உரிமைகள் மற்றும் FIR',
+    nav_analytics:      'பகுப்பாய்வு',
+    nav_analytics_desc: 'அறிக்கைகள்',
   },
 
   te: {
@@ -377,6 +389,10 @@ export const translations = {
     hh_risk: 'ప్రమాద స్కోర్', hh_duration: 'వ్యవధి', hh_notif: 'నోటిఫికేషన్లు',
     hh_sent: 'పంపబడ్డాయి', hh_ongoing: 'కొనసాగుతోంది',
     hh_prev: '← మునుపటి', hh_next: 'తదుపరి →', hh_page: 'పేజీ', hh_of: 'లో',
+    nav_legal:          'చట్టపరమైన సహాయం',
+    nav_legal_desc:     'హక్కులు & FIR',
+    nav_analytics:      'విశ్లేషణలు',
+    nav_analytics_desc: 'నివేదికలు',
   },
 
   mr: {
@@ -446,6 +462,10 @@ export const translations = {
     hh_risk: 'जोखीम स्कोर', hh_duration: 'कालावधी', hh_notif: 'सूचना',
     hh_sent: 'पाठवल्या', hh_ongoing: 'सुरू आहे',
     hh_prev: '← मागील', hh_next: 'पुढील →', hh_page: 'पृष्ठ', hh_of: 'पैकी',
+    nav_legal:          'कायदेशीर मदत',
+    nav_legal_desc:     'हक्क आणि FIR',
+    nav_analytics:      'विश्लेषण',
+    nav_analytics_desc: 'अहवाल',
   },
 
   bn: {
@@ -515,6 +535,10 @@ export const translations = {
     hh_risk: 'ঝুঁকি স্কোর', hh_duration: 'সময়কাল', hh_notif: 'বিজ্ঞপ্তি',
     hh_sent: 'পাঠানো হয়েছে', hh_ongoing: 'চলমান',
     hh_prev: '← পূর্ববর্তী', hh_next: 'পরবর্তী →', hh_page: 'পৃষ্ঠা', hh_of: 'এর',
+    nav_legal:          'আইনি সহায়তা',
+    nav_legal_desc:     'অধিকার ও FIR',
+    nav_analytics:      'বিশ্লেষণ',
+    nav_analytics_desc: 'রিপোর্ট',
   },
 
   gu: {
@@ -584,6 +608,10 @@ export const translations = {
     hh_risk: 'જોખમ સ્કોર', hh_duration: 'સમય', hh_notif: 'સૂચનાઓ',
     hh_sent: 'મોકલી', hh_ongoing: 'ચાલુ છે',
     hh_prev: '← પાછળ', hh_next: 'આગળ →', hh_page: 'પૃષ્ઠ', hh_of: 'નું',
+    nav_legal:          'કાનૂની મદદ',
+    nav_legal_desc:     'અધિકારો અને FIR',
+    nav_analytics:      'એનાલિટિક્સ',
+    nav_analytics_desc: 'રિપોર્ટ્સ',
   },
 
   kn: {
@@ -653,6 +681,10 @@ export const translations = {
     hh_risk: 'ಅಪಾಯ ಸ್ಕೋರ್', hh_duration: 'ಅವಧಿ', hh_notif: 'ಅಧಿಸೂಚನೆಗಳು',
     hh_sent: 'ಕಳುಹಿಸಲಾಗಿದೆ', hh_ongoing: 'ಮುಂದುವರಿಯುತ್ತಿದೆ',
     hh_prev: '← ಹಿಂದೆ', hh_next: 'ಮುಂದೆ →', hh_page: 'ಪುಟ', hh_of: 'ರಲ್ಲಿ',
+    nav_legal:          'ಕಾನೂನು ನೆರವು',
+    nav_legal_desc:     'ಹಕ್ಕುಗಳು ಮತ್ತು FIR',
+    nav_analytics:      'ವಿಶ್ಲೇಷಣೆ',
+    nav_analytics_desc: 'ವರದಿಗಳು',
   },
 
   ml: {
@@ -722,6 +754,10 @@ export const translations = {
     hh_risk: 'അപകട സ്കോർ', hh_duration: 'ദൈർഘ്യം', hh_notif: 'അറിയിപ്പുകൾ',
     hh_sent: 'അയച്ചു', hh_ongoing: 'തുടരുന്നു',
     hh_prev: '← മുൻ', hh_next: 'അടുത്ത →', hh_page: 'പേജ്', hh_of: 'ൽ',
+    nav_legal:          'നിയമ സഹായം',
+    nav_legal_desc:     'അവകാശങ്ങളും FIR-ഉം',
+    nav_analytics:      'അനലിറ്റിക്സ്',
+    nav_analytics_desc: 'റിപ്പോർട്ടുകൾ',
   },
 
   pa: {
@@ -791,6 +827,10 @@ export const translations = {
     hh_risk: 'ਖ਼ਤਰੇ ਦਾ ਸਕੋਰ', hh_duration: 'ਸਮਾਂ', hh_notif: 'ਸੂਚਨਾਵਾਂ',
     hh_sent: 'ਭੇਜੀਆਂ', hh_ongoing: 'ਜਾਰੀ ਹੈ',
     hh_prev: '← ਪਿਛਲਾ', hh_next: 'ਅਗਲਾ →', hh_page: 'ਪੰਨਾ', hh_of: 'ਦਾ',
+    nav_legal:          'ਕਾਨੂੰਨੀ ਮਦਦ',
+    nav_legal_desc:     'ਅਧਿਕਾਰ ਅਤੇ FIR',
+    nav_analytics:      'ਵਿਸ਼ਲੇਸ਼ਣ',
+    nav_analytics_desc: 'ਰਿਪੋਰਟਾਂ',
   },
 };
 

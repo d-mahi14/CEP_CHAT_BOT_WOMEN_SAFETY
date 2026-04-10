@@ -14,6 +14,8 @@ import HelpHistory from '../SOS/HelpHistory';
 import AIChat from '../AI/AIChat';
 import '../SOS/SOS.css';
 import './Dashboard.css';
+import LegalAssistant from '../Legal/LegalAssistant';
+import Analytics from '../Analytics/Analytics';
 
 const GENDERS      = ['', 'Female', 'Male', 'Non-binary', 'Prefer not to say'];
 const BLOOD_GROUPS = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
@@ -329,6 +331,8 @@ const ProfileDashboard = () => {
     { key:'history',   label:t('nav_history'),    icon:'📋', desc:t('nav_history_desc')   },
     { key:'language',  label:t('nav_language'),   icon:'🌐', desc:t('nav_language_desc')  },
     { key:'profile',   label:t('nav_profile'),    icon:'👤', desc:t('nav_profile_desc')   },
+    { key:'legal',     label:t('nav_legal'),     icon:'⚖️', desc:t('nav_legal_desc')     },
+    { key:'analytics', label:t('nav_analytics'), icon:'📊', desc:t('nav_analytics_desc') },
   ];
 
   useEffect(() => { loadProfile(); }, []);
@@ -507,6 +511,8 @@ const ProfileDashboard = () => {
               onSaved={loadProfile}
             />
           )}
+          {activeTab === 'legal'     && <LegalAssistant />}
+          {activeTab === 'analytics' && <Analytics />}
         </div>
       </main>
     </div>
