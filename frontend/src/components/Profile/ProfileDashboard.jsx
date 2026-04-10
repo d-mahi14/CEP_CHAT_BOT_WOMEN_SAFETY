@@ -45,26 +45,12 @@ function formatDateTime(iso) {
 // with the current session time so next visit shows this one.
 const PREV_LOGIN_KEY = 'safeguard_prev_login';
 
-function resolveAndRotatePreviousLogin(supabaseUser) {
-  const currentSessionTime = supabaseUser?.last_sign_in_at;
-  const stored = localStorage.getItem(PREV_LOGIN_KEY);
 
-  // Update store for next session
-  if (currentSessionTime) {
-    localStorage.setItem(PREV_LOGIN_KEY, currentSessionTime);
-  }
-
-  // Return the PREVIOUS value (what was stored before this load)
-  // If stored === currentSessionTime it's the same session (page refresh),
-  // so show nothing meaningful yet.
-  if (!stored || stored === currentSessionTime) return null;
-  return stored;
-}
 
 /* ══════════════════════════════════════════════════
    ProfileEditor
    ══════════════════════════════════════════════════ */
-const ProfileEditor = ({ userObj, profileObj, userEmail, previousLoginTime, onSaved }) => {
+const ProfileEditor = ({ userObj, profileObj, userEmail, onSaved }) => {
   const { t } = useLanguage();
   const fileInputRef = useRef(null);
 
@@ -141,9 +127,6 @@ const ProfileEditor = ({ userObj, profileObj, userEmail, previousLoginTime, onSa
 
   const initials = (userObj?.fullName || userEmail || 'U').charAt(0).toUpperCase();
 
-  const lastLoginDisplay =
-    formatDateTime(previousLoginTime) ||
-    '—';
 
   return (
     <div className="pe-wrap">
@@ -257,8 +240,6 @@ const ProfileEditor = ({ userObj, profileObj, userEmail, previousLoginTime, onSa
                 ? new Date(profileObj.date_of_birth).toLocaleDateString('en-IN') : '—' },
             { icon:'🩸', label:t('blood_group'),   value: profileObj?.blood_group || '—' },
             { icon:'📝', label:t('bio'),           value: profileObj?.bio         || '—' },
-            { icon:'🕐', label:t('last_login'),    value: lastLoginDisplay },
-            { icon:'🔒', label:t('status'),        value: (userObj?.isActive ?? true) ? t('active') : 'Inactive' },
           ].map(item => (
             <div className="pe-card" key={item.label}>
               <span className="pe-card-icon">{item.icon}</span>
@@ -339,7 +320,6 @@ const ProfileDashboard = () => {
   const [activeTab,        setActiveTab]        = useState('sos');
   const [sosActive,        setSosActive]        = useState(false);
   const [sidebarOpen,      setSidebarOpen]      = useState(false);
-  const [previousLoginTime,setPreviousLoginTime]= useState(null);
 
   const TABS = [
     { key:'sos',       label:t('nav_sos'),       icon:'🆘', desc:t('nav_sos_desc')       },
@@ -359,10 +339,7 @@ const ProfileDashboard = () => {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
 
-      // Resolve previous login time
-      const prev = resolveAndRotatePreviousLogin(currentUser);
-      setPreviousLoginTime(prev);
-
+  
       const response = await profileAPI.getProfile();
       if (response.success) {
         setProfile(response.data.user        || {});
@@ -527,7 +504,6 @@ const ProfileDashboard = () => {
               userObj={profile}
               profileObj={profileData}
               userEmail={user?.email}
-              previousLoginTime={previousLoginTime}
               onSaved={loadProfile}
             />
           )}
