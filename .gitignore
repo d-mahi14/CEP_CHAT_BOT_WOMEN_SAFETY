@@ -11,7 +11,7 @@ backend/venv/
 backend/.env
 backend/*.log
 backend/.mypy_cache/
-
+node_modules/
 # OS / Editor
 .vscode/
 .idea/

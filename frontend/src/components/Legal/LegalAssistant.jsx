@@ -1,13 +1,7 @@
-// =====================================================
-// LegalAssistant.jsx
-// Modules: Know Your Rights Info, Draft FIR Assistant,
-//          IPC/Local Law Help, FIR Filing Guidance
-//          (all in the PDF UML diagram — missing from code)
-// =====================================================
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import axios from 'axios';
 import { getCurrentSession } from '../../services/supabaseClient';
+import { useLanguage } from '../../context/LanguageContext';
 
 const NODE_API = process.env.REACT_APP_NODE_API_URL || 'http://localhost:5000';
 
@@ -25,14 +19,13 @@ const TOPIC_META = {
   child_marriage:    { icon: '👧', color: '#2563eb', label: 'Child Marriage' },
 };
 
-const OFFENSE_TYPES = Object.entries(TOPIC_META).map(([k, v]) => ({ value: k, label: v.label }));
-
 // ── Know Your Rights Panel ────────────────────────
 const KnowYourRights = () => {
-  const [topics,    setTopics]    = useState([]);
-  const [selected,  setSelected]  = useState(null);
-  const [info,      setInfo]      = useState(null);
-  const [loading,   setLoading]   = useState(false);
+  const { t } = useLanguage();
+  const [topics, setTopics] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [info, setInfo] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     getHeaders().then(h =>
@@ -57,7 +50,7 @@ const KnowYourRights = () => {
 
   return (
     <div>
-      <p className="la-subtitle">Select a topic to learn your legal rights and steps to take</p>
+      <p className="la-subtitle">{t('legal_subtitle_rights')}</p>
       <div className="la-topic-grid">
         {Object.entries(TOPIC_META).map(([key, m]) => (
           <button
@@ -72,27 +65,23 @@ const KnowYourRights = () => {
         ))}
       </div>
 
-      {loading && <div className="la-loading">Loading legal information…</div>}
+      {loading && <div className="la-loading">{t('legal_loading')}</div>}
 
       {info && !loading && (
         <div className="la-info-card" style={{ borderLeft: `3px solid ${meta?.color}` }}>
           <h3 className="la-info-title">{info.title}</h3>
-
           <div className="la-info-section">
             <h4>Applicable Laws</h4>
             <ul>{(info.acts || []).map((a, i) => <li key={i}>{a}</li>)}</ul>
           </div>
-
           <div className="la-info-section">
             <h4>Your Rights</h4>
             <ul>{(info.rights || []).map((r, i) => <li key={i}>✓ {r}</li>)}</ul>
           </div>
-
           <div className="la-info-section">
             <h4>What to Do — Step by Step</h4>
             <ol>{(info.steps || []).map((s, i) => <li key={i}>{s}</li>)}</ol>
           </div>
-
           <div className="la-info-section">
             <h4>IPC Sections</h4>
             <div className="la-ipc-grid">
@@ -101,9 +90,8 @@ const KnowYourRights = () => {
               ))}
             </div>
           </div>
-
           <div className="la-helplines-row">
-            <span className="la-hl-label">Emergency Helplines:</span>
+            <span className="la-hl-label">{t('legal_answer_helplines')}:</span>
             {(info.helplines || []).map((h, i) => (
               <a key={i} href={`tel:${h.split(' ')[0]}`} className="la-hl-pill">{h}</a>
             ))}
@@ -116,16 +104,20 @@ const KnowYourRights = () => {
 
 // ── AI Legal Q&A ──────────────────────────────────
 const LegalQA = () => {
+  // 1. Get both translation function and language code from context
+  const { t, languageCode } = useLanguage(); 
+  
   const [question, setQuestion] = useState('');
-  const [answer,   setAnswer]   = useState(null);
-  const [loading,  setLoading]  = useState(false);
-  const [error,    setError]    = useState('');
+  const [answer, setAnswer] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
+  // 2. Localize Example Questions via translation keys
   const EXAMPLE_QS = [
-    'Can I file an FIR if my husband is abusive?',
-    'What is the punishment for stalking under IPC?',
-    'How do I register a complaint at the workplace?',
-    'What are my rights if I am harassed in public?',
+    t('legal_example_1'),
+    t('legal_example_2'),
+    t('legal_example_3'),
+    t('legal_example_4'),
   ];
 
   const ask = async (q) => {
@@ -134,34 +126,49 @@ const LegalQA = () => {
     setLoading(true);
     setAnswer(null);
     setError('');
+    
     try {
       const h = await getHeaders();
-      const r = await axios.post(`${NODE_API}/api/legal/ai-legal-help`, { question: text }, { headers: h });
+      // 3. Pass the languageCode to the backend so the AI knows which language to output
+      const r = await axios.post(
+        `${NODE_API}/api/legal/ai-legal-help`, 
+        { 
+          question: text,
+          language: languageCode // Backend uses this to steer the LLM response
+        }, 
+        { headers: h }
+      );
       setAnswer(r.data?.data);
-    } catch { setError('Could not reach the legal AI. Please try again.'); }
+    } catch { 
+      setError(t('legal_error')); 
+    }
     setLoading(false);
   };
 
   return (
     <div>
-      <p className="la-subtitle">Ask any question about your legal rights in India</p>
-
+      <p className="la-subtitle">{t('legal_subtitle_qa')}</p>
+      
       <div className="la-qa-input-row">
         <input
           className="la-qa-input"
-          placeholder="e.g. What is IPC 354A? How do I file an FIR?"
+          placeholder={t('legal_ask_ph')}
           value={question}
           onChange={e => setQuestion(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && ask()}
         />
         <button className="la-qa-btn" onClick={() => ask()} disabled={!question.trim() || loading}>
-          {loading ? '…' : 'Ask'}
+          {loading ? '…' : t('legal_ask_btn')}
         </button>
       </div>
 
       <div className="la-example-prompts">
-        {EXAMPLE_QS.map(q => (
-          <button key={q} className="la-example-btn" onClick={() => { setQuestion(q); ask(q); }}>
+        {EXAMPLE_QS.map((q, index) => (
+          <button 
+            key={index} 
+            className="la-example-btn" 
+            onClick={() => { setQuestion(q); ask(q); }}
+          >
             {q}
           </button>
         ))}
@@ -171,29 +178,34 @@ const LegalQA = () => {
 
       {answer && (
         <div className="la-answer-card">
+          {/* AI generated answer will now be in the requested language */}
           <p className="la-answer-text">{answer.answer}</p>
-
+          
           {answer.relevant_sections?.length > 0 && (
             <div className="la-answer-section">
-              <strong>Relevant Sections:</strong>
+              <strong>{t('legal_answer_sections')}:</strong>
               <div className="la-ipc-grid" style={{ marginTop: 6 }}>
-                {answer.relevant_sections.map((s, i) => <span key={i} className="la-ipc-badge">{s}</span>)}
+                {answer.relevant_sections.map((s, i) => (
+                  <span key={i} className="la-ipc-badge">{s}</span>
+                ))}
               </div>
             </div>
           )}
 
           {answer.next_steps?.length > 0 && (
             <div className="la-answer-section">
-              <strong>Next Steps:</strong>
+              <strong>{t('legal_answer_steps')}:</strong>
               <ol style={{ margin: '6px 0 0 0', paddingLeft: 18 }}>
-                {answer.next_steps.map((s, i) => <li key={i} style={{ marginBottom: 4 }}>{s}</li>)}
+                {answer.next_steps.map((s, i) => (
+                  <li key={i} style={{ marginBottom: 4 }}>{s}</li>
+                ))}
               </ol>
             </div>
           )}
 
           {answer.helplines?.length > 0 && (
             <div className="la-helplines-row" style={{ marginTop: 12 }}>
-              <span className="la-hl-label">Helplines:</span>
+              <span className="la-hl-label">{t('legal_answer_helplines')}:</span>
               {answer.helplines.map((h, i) => (
                 <a key={i} href={`tel:${h.split(' ')[0]}`} className="la-hl-pill">{h}</a>
               ))}
@@ -207,15 +219,20 @@ const LegalQA = () => {
 
 // ── FIR Draft Assistant ────────────────────────────
 const FIRDraft = () => {
+  const { t } = useLanguage();
   const [form, setForm] = useState({
     complainantName: '', complainantAddress: '', complainantPhone: '',
     incidentDate: '', incidentTime: '', incidentLocation: '',
     accusedDescription: '', incidentDescription: '', witnesses: '',
     offenseType: 'sexual_harassment',
   });
-  const [draft,   setDraft]   = useState('');
+  const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(false);
-  const [copied,  setCopied]  = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const OFFENSE_TYPES = useMemo(() => 
+    Object.entries(TOPIC_META).map(([k, v]) => ({ value: k, label: v.label })), []
+  );
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
@@ -226,7 +243,7 @@ const FIRDraft = () => {
       const h = await getHeaders();
       const r = await axios.post(`${NODE_API}/api/legal/fir-draft`, form, { headers: h });
       setDraft(r.data?.data?.draft || '');
-    } catch { setDraft('Failed to generate draft. Please try again.'); }
+    } catch { setDraft('Failed to generate draft.'); }
     setLoading(false);
   };
 
@@ -239,72 +256,63 @@ const FIRDraft = () => {
 
   return (
     <div>
-      <p className="la-subtitle">Fill in the details below and we'll draft an FIR complaint for you</p>
-
+      <p className="la-subtitle">{t('legal_subtitle_fir')}</p>
       <div className="la-fir-grid">
         <div className="la-field">
-          <label className="la-label">Type of Offense *</label>
+          <label className="la-label">{t('legal_fir_offense')} *</label>
           <select className="la-input" value={form.offenseType} onChange={set('offenseType')}>
             {OFFENSE_TYPES.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         </div>
         <div className="la-field">
-          <label className="la-label">Your Full Name</label>
-          <input className="la-input" placeholder="As in ID proof" value={form.complainantName} onChange={set('complainantName')} />
+          <label className="la-label">{t('legal_fir_name')}</label>
+          <input className="la-input" value={form.complainantName} onChange={set('complainantName')} />
         </div>
         <div className="la-field">
-          <label className="la-label">Your Phone Number</label>
-          <input className="la-input" placeholder="+91 ..." value={form.complainantPhone} onChange={set('complainantPhone')} />
+          <label className="la-label">{t('legal_fir_phone')}</label>
+          <input className="la-input" value={form.complainantPhone} onChange={set('complainantPhone')} />
         </div>
         <div className="la-field">
-          <label className="la-label">Date of Incident *</label>
+          <label className="la-label">{t('legal_fir_date')} *</label>
           <input className="la-input" type="date" value={form.incidentDate} onChange={set('incidentDate')} />
         </div>
         <div className="la-field">
-          <label className="la-label">Time of Incident</label>
+          <label className="la-label">{t('legal_fir_time')}</label>
           <input className="la-input" type="time" value={form.incidentTime} onChange={set('incidentTime')} />
         </div>
         <div className="la-field" style={{ gridColumn: '1 / -1' }}>
-          <label className="la-label">Location of Incident *</label>
-          <input className="la-input" placeholder="Full address / landmark where it happened" value={form.incidentLocation} onChange={set('incidentLocation')} />
+          <label className="la-label">{t('legal_fir_location')} *</label>
+          <input className="la-input" value={form.incidentLocation} onChange={set('incidentLocation')} />
         </div>
         <div className="la-field" style={{ gridColumn: '1 / -1' }}>
-          <label className="la-label">Your Full Address</label>
-          <input className="la-input" placeholder="Your residence address" value={form.complainantAddress} onChange={set('complainantAddress')} />
+          <label className="la-label">{t('legal_fir_address')}</label>
+          <input className="la-input" value={form.complainantAddress} onChange={set('complainantAddress')} />
         </div>
         <div className="la-field" style={{ gridColumn: '1 / -1' }}>
-          <label className="la-label">Description of Accused</label>
-          <input className="la-input" placeholder="Name (if known), physical description, relationship to you" value={form.accusedDescription} onChange={set('accusedDescription')} />
+          <label className="la-label">{t('legal_fir_accused')}</label>
+          <input className="la-input" value={form.accusedDescription} onChange={set('accusedDescription')} />
         </div>
         <div className="la-field" style={{ gridColumn: '1 / -1' }}>
-          <label className="la-label">Incident Description *</label>
-          <textarea
-            className="la-input la-textarea"
-            rows={5}
-            placeholder="Describe what happened in detail — sequence of events, any threats or injuries..."
-            value={form.incidentDescription}
-            onChange={set('incidentDescription')}
-          />
+          <label className="la-label">{t('legal_fir_desc')} *</label>
+          <textarea className="la-input la-textarea" rows={5} value={form.incidentDescription} onChange={set('incidentDescription')} />
         </div>
         <div className="la-field" style={{ gridColumn: '1 / -1' }}>
-          <label className="la-label">Witnesses (if any)</label>
-          <input className="la-input" placeholder="Names and contact details of witnesses" value={form.witnesses} onChange={set('witnesses')} />
+          <label className="la-label">{t('legal_fir_witnesses')}</label>
+          <input className="la-input" value={form.witnesses} onChange={set('witnesses')} />
         </div>
       </div>
 
-      <div className="la-fir-notice">
-        ℹ️ This is a draft template. Review carefully and modify as needed before submitting to the police.
-      </div>
+      <div className="la-fir-notice">ℹ️ {t('legal_fir_notice')}</div>
 
       <button className="la-generate-btn" onClick={generate} disabled={!form.incidentDescription.trim() || loading}>
-        {loading ? 'Generating…' : '📄 Generate FIR Draft'}
+        {loading ? t('legal_fir_generating') : `📄 ${t('legal_fir_generate')}`}
       </button>
 
       {draft && (
         <div className="la-draft-box">
           <div className="la-draft-header">
             <span>Generated FIR Draft</span>
-            <button className="la-copy-btn" onClick={copy}>{copied ? '✓ Copied' : 'Copy'}</button>
+            <button className="la-copy-btn" onClick={copy}>{copied ? t('legal_fir_copied') : t('legal_fir_copy')}</button>
           </div>
           <pre className="la-draft-text">{draft}</pre>
         </div>
@@ -316,12 +324,13 @@ const FIRDraft = () => {
 // ── Main Legal Assistant Component ─────────────────
 const LegalAssistant = () => {
   const [tab, setTab] = useState('rights');
+  const { t } = useLanguage();
 
-  const TABS = [
-    { key: 'rights', icon: '⚖️', label: 'Know Your Rights' },
-    { key: 'qa',     icon: '🤖', label: 'Ask AI Legal Help' },
-    { key: 'fir',    icon: '📄', label: 'Draft FIR' },
-  ];
+  const TABS = useMemo(() => [
+    { key: 'rights', icon: '⚖️', label: t('legal_tab_rights') },
+    { key: 'qa',     icon: '🤖', label: t('legal_tab_qa') },
+    { key: 'fir',    icon: '📄', label: t('legal_tab_fir') },
+  ], [t]);
 
   return (
     <div className="la-container">
@@ -340,11 +349,12 @@ const LegalAssistant = () => {
 
       <div className="la-panel">
         {tab === 'rights' && <KnowYourRights />}
-        {tab === 'qa'     && <LegalQA />}
-        {tab === 'fir'    && <FIRDraft />}
+        {tab === 'qa'      && <LegalQA />}
+        {tab === 'fir'     && <FIRDraft />}
       </div>
 
       <style>{`
+        /* ... existing styles remain unchanged ... */
         .la-container{max-width:760px;margin:0 auto;font-family:'DM Sans',sans-serif}
         .la-tab-bar{display:flex;gap:0;border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden;margin-bottom:20px}
         .la-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:12px 8px;background:#131929;border:none;color:#64748b;font-size:.85rem;font-weight:500;cursor:pointer;transition:all .2s;font-family:inherit;border-right:1px solid rgba(255,255,255,.07)}

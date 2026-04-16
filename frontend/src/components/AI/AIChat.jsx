@@ -4,7 +4,7 @@
 // Modules: 6 (Voice), 7 (Text), 8 (Emotion), 16 (Intent),
 //          17 (Context), 18 (Abuse Alert), 19 (Risk), 20 (Multilingual)
 // =====================================================
-
+import { useLanguage } from '../../context/LanguageContext';
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useVoiceInput } from '../../hooks/useVoiceInput';
 import { aiAPI } from '../../services/aiService';
@@ -127,6 +127,7 @@ const AIChat = ({ userLanguage = 'en', onEmergencyDetected }) => {
   const messagesEndRef = useRef(null);
   const inputRef       = useRef(null);
   const textareaRef    = useRef(null);
+  const { t } = useLanguage();
 
   // Auto scroll
   useEffect(() => {
@@ -201,7 +202,7 @@ const AIChat = ({ userLanguage = 'en', onEmergencyDetected }) => {
         }
       }
     } catch (err) {
-      setError('Failed to send message. Check your connection.');
+      setError(t('ai_error'));
       setMessages(prev => prev.filter(m => m.id !== userMsgId));
     } finally {
       setLoading(false);
@@ -242,16 +243,16 @@ const AIChat = ({ userLanguage = 'en', onEmergencyDetected }) => {
         <div className="chat-header-left">
           <span className="chat-ai-avatar">🤖</span>
           <div>
-            <h3 className="chat-title">Safety Assistant</h3>
+            <h3 className="chat-title">{t('ai_title')}</h3>
             <p className="chat-subtitle">
-              AI-powered · {supported ? 'Voice ready' : 'Text only'} · 10 Indian languages
+              {supported ? t('ai_subtitle_voice') : t('ai_subtitle_text')} · {t('ai_languages')}
             </p>
           </div>
         </div>
         <button
           className="chat-clear-btn"
           onClick={() => { setMessages([]); aiAPI.clearContext(); setAutoSOSBanner(null); }}
-          title="Clear conversation"
+          title={t('ai_clear')}
         >
           🗑️
         </button>
@@ -260,7 +261,7 @@ const AIChat = ({ userLanguage = 'en', onEmergencyDetected }) => {
       {/* Auto-SOS Banner */}
       {autoSOSBanner && (
         <div className="auto-sos-banner">
-          🆘 Emergency auto-detected — SOS triggered automatically
+          🆘 {t('ai_auto_sos')}
           <button onClick={() => setAutoSOSBanner(null)}>×</button>
         </div>
       )}
@@ -270,8 +271,8 @@ const AIChat = ({ userLanguage = 'en', onEmergencyDetected }) => {
         {messages.length === 0 && (
           <div className="chat-empty">
             <span className="empty-chat-icon">🛡️</span>
-            <p>Tell me what's happening.</p>
-            <p className="empty-sub">Type or speak — any Indian language supported.</p>
+            <p>{t('ai_empty_title')}</p>
+              <p className="empty-sub">{t('ai_empty_sub')}</p>
             <div className="example-prompts">
               {EXAMPLE_PROMPTS.map(p => (
                 <button key={p} className="example-prompt-btn" onClick={() => sendMessage(p, 'text')}>
@@ -301,7 +302,7 @@ const AIChat = ({ userLanguage = 'en', onEmergencyDetected }) => {
               <div key={i} className="voice-wave" style={{ animationDelay: `${i * 0.1}s` }} />
             ))}
           </div>
-          <span className="voice-interim">{interimText || 'Listening…'}</span>
+          <span className="voice-interim">{interimText || t('ai_listening')}</span>
           <button className="voice-cancel" onClick={stopListening}>✕</button>
         </div>
       )}
@@ -319,7 +320,7 @@ const AIChat = ({ userLanguage = 'en', onEmergencyDetected }) => {
           value={inputText}
           onChange={handleTextareaChange}
           onKeyDown={handleKeyDown}
-          placeholder={isListening ? 'Listening…' : 'Type a message… (Shift+Enter for new line)'}
+          placeholder={isListening ? t('ai_listening') : t('ai_placeholder')}
           rows={1}
           disabled={loading || isListening}
         />

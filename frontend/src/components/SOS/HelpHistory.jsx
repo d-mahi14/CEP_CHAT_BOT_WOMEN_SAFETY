@@ -1,10 +1,6 @@
-// =====================================================
-// HelpHistory Component — Module 9
-// Shows user's past SOS incidents
-// =====================================================
-
 import React, { useState, useEffect } from 'react';
 import { sosAPI } from '../../services/sosService';
+import { useLanguage } from '../../context/LanguageContext';
 
 const STATUS_CONFIG = {
   triggered:   { label: 'Triggered',   color: '#f59e0b', icon: '⚡' },
@@ -22,6 +18,8 @@ const TRIGGER_LABELS = {
 };
 
 const HelpHistory = () => {
+  const { t } = useLanguage();
+
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
@@ -55,7 +53,7 @@ const HelpHistory = () => {
   };
 
   const getDuration = (start, end) => {
-    if (!end) return 'Ongoing';
+    if (!end) return t('hh_ongoing');
     const ms = new Date(end) - new Date(start);
     const mins = Math.floor(ms / 60000);
     const secs = Math.floor((ms % 60000) / 1000);
@@ -63,19 +61,21 @@ const HelpHistory = () => {
   };
 
   if (loading && page === 1) {
-    return <div className="history-loading">Loading history...</div>;
+    return <div className="history-loading">{t('hh_loading')}</div>;
   }
 
   return (
     <div className="help-history-container">
-      <h3 className="history-title">📋 Help History</h3>
-      <p className="history-subtitle">{total} incident{total !== 1 ? 's' : ''} recorded</p>
+      <h3 className="history-title">📋 {t('hh_title')}</h3>
+      <p className="history-subtitle">
+        {total} {t('hh_incidents')}
+      </p>
 
       {history.length === 0 ? (
         <div className="history-empty">
           <span className="empty-icon">🛡️</span>
-          <p>No emergency incidents yet.</p>
-          <p className="empty-sub">Stay safe — your history will appear here.</p>
+          <p>{t('hh_empty')}</p>
+          <p className="empty-sub">{t('hh_empty_sub')}</p>
         </div>
       ) : (
         <>
@@ -90,7 +90,6 @@ const HelpHistory = () => {
                   className={`history-card ${isExpanded ? 'expanded' : ''}`}
                   onClick={() => setExpanded(isExpanded ? null : inc.id)}
                 >
-                  {/* Card Header */}
                   <div className="history-card-header">
                     <div className="history-left">
                       <span className="history-status-icon">{statusCfg.icon}</span>
@@ -103,6 +102,7 @@ const HelpHistory = () => {
                         <div className="history-date">{formatDate(inc.created_at)}</div>
                       </div>
                     </div>
+
                     <div className="history-right">
                       <span
                         className="history-status-badge"
@@ -114,34 +114,38 @@ const HelpHistory = () => {
                     </div>
                   </div>
 
-                  {/* Expanded Details */}
                   {isExpanded && (
                     <div className="history-card-body">
                       <div className="history-detail-grid">
+
                         <div className="detail-item">
-                          <span className="detail-label">Trigger</span>
+                          <span className="detail-label">{t('hh_trigger')}</span>
                           <span className="detail-value">
                             {TRIGGER_LABELS[inc.trigger_type] || inc.trigger_type}
                           </span>
                         </div>
+
                         <div className="detail-item">
-                          <span className="detail-label">Risk Score</span>
-                          <span className="detail-value risk" data-score={inc.risk_score}>
+                          <span className="detail-label">{t('hh_risk')}</span>
+                          <span className="detail-value risk">
                             {inc.risk_score}/10
                           </span>
                         </div>
+
                         <div className="detail-item">
-                          <span className="detail-label">Duration</span>
+                          <span className="detail-label">{t('hh_duration')}</span>
                           <span className="detail-value">
                             {getDuration(inc.created_at, inc.resolved_at)}
                           </span>
                         </div>
+
                         <div className="detail-item">
-                          <span className="detail-label">Notifications</span>
+                          <span className="detail-label">{t('hh_notif')}</span>
                           <span className="detail-value">
-                            {inc.notifications_sent || 0} sent
+                            {inc.notifications_sent || 0} {t('hh_sent')}
                           </span>
                         </div>
+
                       </div>
 
                       {inc.city && (
@@ -162,7 +166,6 @@ const HelpHistory = () => {
             })}
           </div>
 
-          {/* Pagination */}
           {total > LIMIT && (
             <div className="history-pagination">
               <button
@@ -170,17 +173,19 @@ const HelpHistory = () => {
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1 || loading}
               >
-                ← Prev
+                ← {t('hh_prev')}
               </button>
+
               <span className="page-info">
-                Page {page} of {Math.ceil(total / LIMIT)}
+                {t('hh_page')} {page} {t('hh_of')} {Math.ceil(total / LIMIT)}
               </span>
+
               <button
                 className="page-btn"
                 onClick={() => setPage(p => p + 1)}
                 disabled={page >= Math.ceil(total / LIMIT) || loading}
               >
-                Next →
+                {t('hh_next')} →
               </button>
             </div>
           )}

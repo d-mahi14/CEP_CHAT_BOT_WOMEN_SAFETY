@@ -1,10 +1,6 @@
-// =====================================================
-// EmergencyContacts.jsx — REDESIGNED
-// Dark theme · works inside Dashboard.css overrides
-// =====================================================
-
 import React, { useState, useEffect } from 'react';
 import { emergencyAPI } from '../../services/api';
+import { useLanguage } from '../../context/LanguageContext';
 
 const RELATIONSHIPS = [
   'Mother', 'Father', 'Sister', 'Brother', 'Spouse',
@@ -12,13 +8,15 @@ const RELATIONSHIPS = [
 ];
 
 const EmergencyContacts = () => {
-  const [contacts,  setContacts]  = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [showForm,  setShowForm]  = useState(false);
-  const [saving,    setSaving]    = useState(false);
-  const [deleting,  setDeleting]  = useState(null);
-  const [error,     setError]     = useState('');
-  const [formData,  setFormData]  = useState({
+  const { t } = useLanguage();
+
+  const [contacts, setContacts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(null);
+  const [error, setError] = useState('');
+  const [formData, setFormData] = useState({
     contactName: '', phoneNumber: '', relationship: '', email: '', notes: '',
   });
 
@@ -29,8 +27,8 @@ const EmergencyContacts = () => {
       setLoading(true);
       const response = await emergencyAPI.getContacts();
       if (response.success) setContacts(response.data.contacts);
-    } catch (err) {
-      setError('Failed to load contacts');
+    } catch {
+      setError(t('ec_err_load'));
     } finally {
       setLoading(false);
     }
@@ -39,7 +37,7 @@ const EmergencyContacts = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.contactName.trim() || !formData.phoneNumber.trim() || !formData.relationship) {
-      setError('Name, phone, and relationship are required.');
+      setError(t('ec_err_fields'));
       return;
     }
     setSaving(true);
@@ -49,21 +47,21 @@ const EmergencyContacts = () => {
       setFormData({ contactName: '', phoneNumber: '', relationship: '', email: '', notes: '' });
       setShowForm(false);
       loadContacts();
-    } catch (err) {
-      setError('Failed to add contact. Please try again.');
+    } catch {
+      setError(t('ec_err_add'));
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm('Remove this emergency contact?')) return;
+    if (!window.confirm(t('ec_confirm_del'))) return;
     setDeleting(id);
     try {
       await emergencyAPI.deleteContact(id);
       loadContacts();
     } catch {
-      setError('Failed to delete contact.');
+      setError(t('ec_err_del'));
     } finally {
       setDeleting(null);
     }
@@ -74,61 +72,65 @@ const EmergencyContacts = () => {
     if (error) setError('');
   };
 
-  if (loading) return <div className="ec-loading">Loading contacts…</div>;
+  if (loading) return <div className="ec-loading">{t('ec_loading')}</div>;
 
   return (
     <div className="ec-container">
       <div className="ec-header">
         <div>
-          <h3 className="ec-title">Emergency Contacts</h3>
+          <h3 className="ec-title">{t('ec_title')}</h3>
           <p className="ec-subtitle">
-            {contacts.length} contact{contacts.length !== 1 ? 's' : ''} · Notified when you trigger SOS
+            {contacts.length} {contacts.length !== 1 ? t('ec_subtitle_many') : t('ec_subtitle_one')} · {t('ec_notified')}
           </p>
         </div>
+
         <button
           className={`ec-add-btn ${showForm ? 'cancel' : ''}`}
           onClick={() => { setShowForm(s => !s); setError(''); }}
         >
-          {showForm ? '✕ Cancel' : '+ Add Contact'}
+          {showForm ? `✕ ${t('ec_cancel')}` : `+ ${t('ec_add')}`}
         </button>
       </div>
 
       {error && <div className="ec-error">{error}</div>}
 
-      {/* Add form */}
       {showForm && (
         <form className="ec-form" onSubmit={handleSubmit} noValidate>
           <div className="ec-form-grid">
+
             <div className="ec-field">
-              <label className="ec-label">Full Name *</label>
+              <label className="ec-label">{t('ec_name')} *</label>
               <input
                 className="ec-input"
                 type="text"
-                placeholder="e.g. Priya's Mom"
+                placeholder={t('ec_name_ph')}
                 value={formData.contactName}
                 onChange={set('contactName')}
               />
             </div>
+
             <div className="ec-field">
-              <label className="ec-label">Phone Number *</label>
+              <label className="ec-label">{t('ec_phone')} *</label>
               <input
                 className="ec-input"
                 type="tel"
-                placeholder="+91 98765 43210"
+                placeholder={t('ec_phone_ph')}
                 value={formData.phoneNumber}
                 onChange={set('phoneNumber')}
                 inputMode="tel"
               />
             </div>
+
             <div className="ec-field">
-              <label className="ec-label">Relationship *</label>
+              <label className="ec-label">{t('ec_relation')} *</label>
               <select className="ec-input" value={formData.relationship} onChange={set('relationship')}>
-                <option value="">Select…</option>
+                <option value="">{t('ec_select')}</option>
                 {RELATIONSHIPS.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
+
             <div className="ec-field">
-              <label className="ec-label">Email (optional)</label>
+              <label className="ec-label">{t('ec_email')}</label>
               <input
                 className="ec-input"
                 type="email"
@@ -137,35 +139,39 @@ const EmergencyContacts = () => {
                 onChange={set('email')}
               />
             </div>
+
           </div>
+
           <div className="ec-field">
-            <label className="ec-label">Notes (optional)</label>
+            <label className="ec-label">{t('ec_notes')}</label>
             <textarea
               className="ec-input ec-textarea"
-              placeholder="Any additional info…"
+              placeholder={t('ec_notes_ph')}
               value={formData.notes}
               onChange={set('notes')}
               rows={2}
             />
           </div>
+
           <div className="ec-form-actions">
             <button type="submit" className="ec-save-btn" disabled={saving}>
-              {saving ? <><span className="ec-spinner" /> Saving…</> : '✓ Save Contact'}
+              {saving
+                ? <><span className="ec-spinner" /> {t('ec_saving')}</>
+                : `✓ ${t('ec_save')}`}
             </button>
           </div>
         </form>
       )}
 
-      {/* Contacts list */}
       <div className="ec-list">
         {contacts.length === 0 ? (
           <div className="ec-empty">
             <span>📞</span>
-            <p>No emergency contacts yet.</p>
-            <p className="ec-empty-sub">Add contacts so they're notified when you trigger SOS.</p>
+            <p>{t('ec_empty')}</p>
+            <p className="ec-empty-sub">{t('ec_empty_sub')}</p>
             {!showForm && (
               <button className="ec-add-btn" onClick={() => setShowForm(true)}>
-                + Add Your First Contact
+                + {t('ec_add_first')}
               </button>
             )}
           </div>
@@ -173,25 +179,30 @@ const EmergencyContacts = () => {
           contacts.map((contact, index) => (
             <div key={contact.id} className="ec-card">
               <div className="ec-priority-badge">#{index + 1}</div>
+
               <div className="ec-card-info">
                 <h4 className="ec-card-name">{contact.contactName}</h4>
+
                 <a href={`tel:${contact.phoneNumber}`} className="ec-card-phone">
                   📞 {contact.phoneNumber}
                 </a>
+
                 <span className="ec-card-rel">{contact.relationship}</span>
+
                 {contact.email && (
                   <span className="ec-card-email">✉️ {contact.email}</span>
                 )}
               </div>
+
               <div className="ec-card-actions">
-                <a href={`tel:${contact.phoneNumber}`} className="ec-call-btn" title="Call now">
+                <a href={`tel:${contact.phoneNumber}`} className="ec-call-btn">
                   📞
                 </a>
+
                 <button
                   className="ec-delete-btn"
                   onClick={() => handleDelete(contact.id)}
                   disabled={deleting === contact.id}
-                  title="Remove contact"
                 >
                   {deleting === contact.id ? '…' : '🗑️'}
                 </button>
@@ -200,7 +211,6 @@ const EmergencyContacts = () => {
           ))
         )}
       </div>
-
       <style>{`
         .ec-container { max-width: 700px; margin: 0 auto; font-family: 'DM Sans', sans-serif; }
         .ec-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; gap: 12px; flex-wrap: wrap; }
