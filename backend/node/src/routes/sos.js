@@ -391,6 +391,131 @@ router.get('/helplines', async (req, res) => {
 // ROUTE: NEARBY SAFETY RESOURCES (Module 15)
 // GET /api/sos/nearby?lat=19.07&lng=72.87&radius=5000&type=hospital
 // =====================================================
+
+  // =====================================================
+// ROUTE: NEARBY SAFETY RESOURCES (Module 15)
+// GET /api/sos/nearby?lat=19.07&lng=72.87&radius=5000&type=hospital
+// =====================================================
+
+const GROQ_NEARBY_SYSTEM = `You are a safety assistant for an Indian emergency app.
+Given a location (latitude, longitude), generate a list of nearby safety resources.
+Return ONLY valid JSON with this exact structure:
+{
+  "resources": [
+    {
+      "name": "Resource Name",
+      "resource_type": "hospital|police_station|fire_station|safe_zone|shelter",
+      "address": "Full address string",
+      "phone": "phone number or null",
+      "latitude": 0.0,
+      "longitude": 0.0,
+      "distance_meters": 0,
+      "is_active": true,
+      "source": "ai_generated",
+      "notes": "Brief helpful note about this resource"
+    }
+  ]
+}
+Rules:
+- Return 5-8 realistic resources based on the area
+- Use real, well-known facilities for the city/area (hospitals, police stations, fire stations)
+- Estimate distances realistically based on urban density
+- resource_type must be one of: hospital, police_station, fire_station, safe_zone, shelter
+- phone numbers should be real Indian emergency/institutional numbers where known
+- coordinates should be realistic for the area (slightly offset from user location)
+- For unknown specific addresses, use area/locality name + city`;
+
+async function getAIEnrichedResources(lat, lng, radius, type, cityHint) {
+  try {
+    if (!process.env.GROQ_API_KEY) return [];
+
+    const axios = require('axios');
+    const typeInstruction = type ? `Focus on: ${type} resources only.` : 'Include a mix of hospitals, police stations, and fire stations.';
+
+    const prompt = `User location: ${lat.toFixed(4)}, ${lng.toFixed(4)}
+Search radius: ${radius}m
+City/area hint: ${cityHint || 'India'}
+${typeInstruction}
+
+Generate nearby safety resources for this location. Use your knowledge of Indian cities to suggest real facilities in this area.`;
+
+    const response = await axios.post(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: GROQ_NEARBY_SYSTEM },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.2,
+        max_tokens: 1200,
+        response_format: { type: 'json_object' },
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 15000,
+      }
+    );
+
+    const raw = response.data.choices[0]?.message?.content || '{}';
+    const parsed = JSON.parse(raw);
+    const resources = parsed.resources || [];
+
+    // Filter by type if requested, validate structure, add unique IDs
+    return resources
+      .filter(r => !type || r.resource_type === type)
+      .filter(r => r.name && r.resource_type && r.latitude && r.longitude)
+      .map((r, i) => ({
+        id: `ai_${Date.now()}_${i}`,
+        name: r.name,
+        resource_type: r.resource_type,
+        address: r.address || null,
+        phone: r.phone || null,
+        latitude: Number(r.latitude),
+        longitude: Number(r.longitude),
+        distance_meters: r.distance_meters || null,
+        is_active: true,
+        source: 'ai_generated',
+        notes: r.notes || null,
+      }));
+  } catch (err) {
+    console.error('Groq nearby resources error:', err.message);
+    return [];
+  }
+}
+
+// Reverse geocode lat/lng to city name using a simple lookup
+function estimateCityFromCoords(lat, lng) {
+  // Major Indian city bounding boxes [minLat, maxLat, minLng, maxLng, cityName]
+  const CITIES = [
+    [18.85, 19.35, 72.75, 73.05, 'Mumbai, Maharashtra'],
+    [12.85, 13.15, 77.45, 77.75, 'Bangalore, Karnataka'],
+    [28.40, 28.90, 76.85, 77.40, 'Delhi'],
+    [17.25, 17.55, 78.35, 78.65, 'Hyderabad, Telangana'],
+    [12.95, 13.25, 80.15, 80.35, 'Chennai, Tamil Nadu'],
+    [22.45, 22.65, 88.25, 88.50, 'Kolkata, West Bengal'],
+    [18.45, 18.65, 73.75, 74.00, 'Pune, Maharashtra'],
+    [23.00, 23.15, 72.55, 72.75, 'Ahmedabad, Gujarat'],
+    [26.80, 27.00, 80.85, 81.05, 'Lucknow, Uttar Pradesh'],
+    [21.10, 21.25, 79.00, 79.15, 'Nagpur, Maharashtra'],
+    [15.45, 15.55, 73.80, 73.90, 'Goa'],
+    [11.00, 11.15, 76.90, 77.10, 'Coimbatore, Tamil Nadu'],
+    [9.90,  10.00, 76.25, 76.35, 'Kochi, Kerala'],
+    [31.60, 31.70, 74.85, 74.95, 'Amritsar, Punjab'],
+    [30.68, 30.78, 76.70, 76.80, 'Chandigarh'],
+  ];
+
+  for (const [minLat, maxLat, minLng, maxLng, city] of CITIES) {
+    if (lat >= minLat && lat <= maxLat && lng >= minLng && lng <= maxLng) {
+      return city;
+    }
+  }
+  return 'India';
+}
+
 router.get('/nearby', async (req, res) => {
   try {
     const { lat, lng, radius = 5000, type } = req.query;
@@ -399,35 +524,74 @@ router.get('/nearby', async (req, res) => {
       return res.status(400).json({ success: false, error: 'lat and lng are required' });
     }
 
-    // Simple bounding box filter (approx 1 degree lat/lng ≈ 111km)
-    const radiusDeg = (Number(radius) / 1000) / 111;
-    const minLat = Number(lat) - radiusDeg;
-    const maxLat = Number(lat) + radiusDeg;
-    const minLng = Number(lng) - radiusDeg;
-    const maxLng = Number(lng) + radiusDeg;
+    const latNum = Number(lat);
+    const lngNum = Number(lng);
+    const radiusNum = Number(radius);
 
-    let query = supabase
+    // ── 1. Query database (existing behaviour) ──────────
+    const radiusDeg = radiusNum / 1000 / 111;
+    const minLat = latNum - radiusDeg;
+    const maxLat = latNum + radiusDeg;
+    const minLng = lngNum - radiusDeg;
+    const maxLng = lngNum + radiusDeg;
+
+    let dbQuery = supabase
       .from('safety_resources')
       .select('*')
       .eq('is_active', true)
       .gte('latitude', minLat).lte('latitude', maxLat)
       .gte('longitude', minLng).lte('longitude', maxLng);
 
-    if (type) query = query.eq('resource_type', type);
+    if (type) dbQuery = dbQuery.eq('resource_type', type);
 
-    const { data, error } = await query;
-    if (error) throw error;
+    const { data: dbData, error: dbError } = await dbQuery;
+    if (dbError) throw dbError;
 
-    // Sort by distance (Haversine approx)
-    const withDistance = (data || []).map(r => {
-      const dLat = (r.latitude - lat) * Math.PI / 180;
-      const dLng = (r.longitude - lng) * Math.PI / 180;
-      const a = Math.sin(dLat/2)**2 + Math.cos(lat*Math.PI/180) * Math.cos(r.latitude*Math.PI/180) * Math.sin(dLng/2)**2;
-      const dist = 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-      return { ...r, distance_meters: Math.round(dist) };
-    }).sort((a, b) => a.distance_meters - b.distance_meters);
+    // Add source tag and compute distance for DB results
+    const haversine = (r) => {
+      const dLat = (r.latitude - latNum) * Math.PI / 180;
+      const dLng = (r.longitude - lngNum) * Math.PI / 180;
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(latNum * Math.PI / 180) *
+        Math.cos(r.latitude * Math.PI / 180) *
+        Math.sin(dLng / 2) ** 2;
+      return Math.round(6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+    };
 
-    return res.status(200).json({ success: true, data: { resources: withDistance } });
+    const dbResources = (dbData || []).map(r => ({
+      ...r,
+      source: r.source || 'manual',
+      distance_meters: haversine(r),
+    }));
+
+    // ── 2. If DB results are thin (< 3), enrich with Groq AI ──
+    const AI_THRESHOLD = 3;
+    let aiResources = [];
+
+    if (dbResources.length < AI_THRESHOLD) {
+      const cityHint = estimateCityFromCoords(latNum, lngNum);
+      aiResources = await getAIEnrichedResources(latNum, lngNum, radiusNum, type, cityHint);
+    }
+
+    // ── 3. Merge: DB results first, then AI (deduped by name) ──
+    const dbNames = new Set(dbResources.map(r => r.name.toLowerCase().trim()));
+    const uniqueAI = aiResources.filter(r => !dbNames.has(r.name.toLowerCase().trim()));
+
+    const merged = [...dbResources, ...uniqueAI]
+      .sort((a, b) => (a.distance_meters || 99999) - (b.distance_meters || 99999));
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        resources: merged,
+        meta: {
+          db_count: dbResources.length,
+          ai_count: uniqueAI.length,
+          ai_enriched: uniqueAI.length > 0,
+        },
+      },
+    });
 
   } catch (error) {
     console.error('Nearby resources error:', error);

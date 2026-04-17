@@ -71,6 +71,25 @@ const ResourceCard = ({ resource, userLocation }) => {
               <span style={{ ...s.badge, background: `${color}15`, color, border: `1px solid ${color}30` }}>
                 {resource.resource_type?.replace('_', ' ')}
               </span>
+              // After the existing badge span, add:
+              {resource.source === 'ai_generated' && (
+                <span style={{
+                  padding: '2px 8px',
+                  background: 'rgba(139,92,246,0.15)',
+                  border: '1px solid rgba(139,92,246,0.3)',
+                  borderRadius: 6,
+                  fontSize: '0.68rem',
+                  color: '#a78bfa',
+                  fontWeight: 600,
+                }}>
+                  🤖 AI suggested
+                </span>
+              )}
+              {resource.notes && (
+                <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: 2 }}>
+                  {resource.notes}
+                </span>
+              )}
               {resource.distance_meters && (
                 <span style={s.dist}>
                   📍 {formatDistance(resource.distance_meters)} away
@@ -136,6 +155,7 @@ const NearbyResources = () => {
   const [fetchError,     setFetchError]     = useState('');
   const [radius,         setRadius]         = useState(5000);
   const [searched,       setSearched]       = useState(false);
+  const [aiEnriched, setAiEnriched] = useState(false);
 
   const fetchNearby = useCallback(async (lat, lng) => {
     setLoading(true);
@@ -146,6 +166,7 @@ const NearbyResources = () => {
       const data = res.data?.resources || [];
       setResources(data);
       setFiltered(data);
+      setAiEnriched(res.data?.meta?.ai_enriched || false);
       setSearched(true);
     } catch (err) {
       setFetchError('Could not load nearby resources. Make sure the backend is running.');
@@ -271,6 +292,11 @@ const NearbyResources = () => {
               <p style={s.resultCount}>
                 {filtered.length} resource{filtered.length !== 1 ? 's' : ''} found
                 {userLocation ? ` within ${radius >= 1000 ? `${radius / 1000}km` : `${radius}m`}` : ''}
+                {aiEnriched && (
+                  <span style={{ marginLeft: 8, color: '#a78bfa', fontSize: '0.75rem' }}>
+                    · 🤖 AI-enriched
+                  </span>
+                )}
               </p>
               <div style={s.list}>
                 {filtered.map(r => (
