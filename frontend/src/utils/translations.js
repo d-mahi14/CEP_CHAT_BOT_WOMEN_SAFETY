@@ -170,7 +170,9 @@ export const translations = {
     legal_example_1: "Can I file an FIR if my husband is abusive?",
     legal_example_2: "What is the punishment for stalking under IPC?",
     legal_example_3: "How do I register a complaint at the workplace?",
-    legal_example_4: "What are my rights if I am harassed in public?"
+    legal_example_4: "What are my rights if I am harassed in public?",
+    nav_nearby:      'Nearby',
+    nav_nearby_desc: 'Safety Map'
   },
 
   hi: {

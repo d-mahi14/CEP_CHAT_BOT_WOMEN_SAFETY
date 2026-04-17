@@ -15,8 +15,9 @@ import AIChat from '../AI/AIChat';
 import '../SOS/SOS.css';
 import './Dashboard.css';
 import LegalAssistant from '../Legal/LegalAssistant';
+import ConsentManager from '../Privacy/ConsentManager';
 import Analytics from '../Analytics/Analytics';
-
+import NearbyResources from '../SOS/NearbyResources';
 const GENDERS      = ['', 'Female', 'Male', 'Non-binary', 'Prefer not to say'];
 const BLOOD_GROUPS = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -328,11 +329,13 @@ const ProfileDashboard = () => {
     { key:'ai',        label:t('nav_ai'),         icon:'🤖', desc:t('nav_ai_desc')        },
     { key:'contacts',  label:t('nav_contacts'),   icon:'📞', desc:t('nav_contacts_desc')  },
     { key:'helplines', label:t('nav_helplines'),  icon:'☎️', desc:t('nav_helplines_desc') },
+    { key:'nearby', label:t('nav_nearby'), icon:'🗺️', desc:t('nav_nearby_desc') },
     { key:'history',   label:t('nav_history'),    icon:'📋', desc:t('nav_history_desc')   },
     { key:'language',  label:t('nav_language'),   icon:'🌐', desc:t('nav_language_desc')  },
     { key:'profile',   label:t('nav_profile'),    icon:'👤', desc:t('nav_profile_desc')   },
     { key:'legal',     label:t('nav_legal'),     icon:'⚖️', desc:t('nav_legal_desc')     },
     { key:'analytics', label:t('nav_analytics'), icon:'📊', desc:t('nav_analytics_desc') },
+    { key:'privacy', label:'Privacy', icon:'🔒', desc:'Consent' },
   ];
 
   useEffect(() => { loadProfile(); }, []);
@@ -499,6 +502,7 @@ const ProfileDashboard = () => {
           )}
           {activeTab === 'contacts'  && <EmergencyContacts />}
           {activeTab === 'helplines' && <Helplines />}
+          {activeTab === 'nearby' && <NearbyResources />}
           {activeTab === 'history'   && <HelpHistory />}
           {activeTab === 'language'  && (
             <LanguageSelector currentLanguage={languageCode} onLanguageChange={loadProfile} />
@@ -513,6 +517,7 @@ const ProfileDashboard = () => {
           )}
           {activeTab === 'legal'     && <LegalAssistant />}
           {activeTab === 'analytics' && <Analytics />}
+          {activeTab === 'privacy' && <ConsentManager />}
         </div>
       </main>
     </div>
