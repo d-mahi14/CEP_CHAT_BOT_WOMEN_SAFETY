@@ -1,5 +1,5 @@
 // =====================================================
-// ProfileDashboard.jsx — FULL i18n + Last Login fix
+// ProfileDashboard.jsx — Privacy tab removed
 // =====================================================
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -15,9 +15,9 @@ import AIChat from '../AI/AIChat';
 import '../SOS/SOS.css';
 import './Dashboard.css';
 import LegalAssistant from '../Legal/LegalAssistant';
-import ConsentManager from '../Privacy/ConsentManager';
 import Analytics from '../Analytics/Analytics';
 import NearbyResources from '../SOS/NearbyResources';
+
 const GENDERS      = ['', 'Female', 'Male', 'Non-binary', 'Prefer not to say'];
 const BLOOD_GROUPS = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
@@ -41,14 +41,6 @@ function formatDateTime(iso) {
     });
   } catch { return null; }
 }
-
-// ── Previous Login helpers ─────────────────────────
-// We store the PREVIOUS session's timestamp in localStorage.
-// On each load we show what was stored, then update the store
-// with the current session time so next visit shows this one.
-const PREV_LOGIN_KEY = 'safeguard_prev_login';
-
-
 
 /* ══════════════════════════════════════════════════
    ProfileEditor
@@ -129,7 +121,6 @@ const ProfileEditor = ({ userObj, profileObj, userEmail, onSaved }) => {
   };
 
   const initials = (userObj?.fullName || userEmail || 'U').charAt(0).toUpperCase();
-
 
   return (
     <div className="pe-wrap">
@@ -324,18 +315,18 @@ const ProfileDashboard = () => {
   const [sosActive,        setSosActive]        = useState(false);
   const [sidebarOpen,      setSidebarOpen]      = useState(false);
 
+  // Privacy tab removed from TABS array
   const TABS = [
     { key:'sos',       label:t('nav_sos'),       icon:'🆘', desc:t('nav_sos_desc')       },
     { key:'ai',        label:t('nav_ai'),         icon:'🤖', desc:t('nav_ai_desc')        },
     { key:'contacts',  label:t('nav_contacts'),   icon:'📞', desc:t('nav_contacts_desc')  },
     { key:'helplines', label:t('nav_helplines'),  icon:'☎️', desc:t('nav_helplines_desc') },
-    { key:'nearby', label:t('nav_nearby'), icon:'🗺️', desc:t('nav_nearby_desc') },
+    { key:'nearby',    label:t('nav_nearby'),     icon:'🗺️', desc:t('nav_nearby_desc')    },
     { key:'history',   label:t('nav_history'),    icon:'📋', desc:t('nav_history_desc')   },
     { key:'language',  label:t('nav_language'),   icon:'🌐', desc:t('nav_language_desc')  },
     { key:'profile',   label:t('nav_profile'),    icon:'👤', desc:t('nav_profile_desc')   },
-    { key:'legal',     label:t('nav_legal'),     icon:'⚖️', desc:t('nav_legal_desc')     },
-    { key:'analytics', label:t('nav_analytics'), icon:'📊', desc:t('nav_analytics_desc') },
-    { key:'privacy', label:'Privacy', icon:'🔒', desc:'Consent' },
+    { key:'legal',     label:t('nav_legal'),      icon:'⚖️', desc:t('nav_legal_desc')     },
+    { key:'analytics', label:t('nav_analytics'),  icon:'📊', desc:t('nav_analytics_desc') },
   ];
 
   useEffect(() => { loadProfile(); }, []);
@@ -346,7 +337,6 @@ const ProfileDashboard = () => {
       const currentUser = await getCurrentUser();
       setUser(currentUser);
 
-  
       const response = await profileAPI.getProfile();
       if (response.success) {
         setProfile(response.data.user        || {});
@@ -502,7 +492,7 @@ const ProfileDashboard = () => {
           )}
           {activeTab === 'contacts'  && <EmergencyContacts />}
           {activeTab === 'helplines' && <Helplines />}
-          {activeTab === 'nearby' && <NearbyResources />}
+          {activeTab === 'nearby'    && <NearbyResources />}
           {activeTab === 'history'   && <HelpHistory />}
           {activeTab === 'language'  && (
             <LanguageSelector currentLanguage={languageCode} onLanguageChange={loadProfile} />
@@ -517,7 +507,6 @@ const ProfileDashboard = () => {
           )}
           {activeTab === 'legal'     && <LegalAssistant />}
           {activeTab === 'analytics' && <Analytics />}
-          {activeTab === 'privacy' && <ConsentManager />}
         </div>
       </main>
     </div>
