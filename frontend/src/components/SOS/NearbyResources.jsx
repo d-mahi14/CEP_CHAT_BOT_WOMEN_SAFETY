@@ -1,13 +1,15 @@
 // =====================================================
 // NearbyResources.jsx — Module 15: Nearby Safety Resources
 // =====================================================
-// Displays nearby hospitals, police stations, and safe
-// zones using the existing GET /api/sos/nearby endpoint.
-// Uses browser Geolocation API to get user's position,
-// then shows results sorted by distance with click-to-navigate.
+// FIX: Changing the search radius or resource type now
+//      triggers a fresh API call instead of just
+//      re-filtering the stale cached results.
+//      Previously, distances shown were from the old
+//      cached fetch so "iDream" would show 1.4km on 1km
+//      radius even though it's actually 2.3km away.
 // =====================================================
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { sosAPI } from '../../services/sosService';
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -37,16 +39,17 @@ const TYPE_ICONS = {
 };
 
 function formatDistance(meters) {
-  if (meters < 1000) return `${meters}m`;
+  if (!meters && meters !== 0) return null;
+  if (meters < 1000) return `${Math.round(meters)}m`;
   return `${(meters / 1000).toFixed(1)}km`;
-}
-
-function getGoogleMapsUrl(lat, lng, name) {
-  return `https://maps.google.com/?q=${encodeURIComponent(name)}&ll=${lat},${lng}&z=16`;
 }
 
 function getDirectionsUrl(userLat, userLng, destLat, destLng) {
   return `https://www.google.com/maps/dir/${userLat},${userLng}/${destLat},${destLng}`;
+}
+
+function getGoogleMapsUrl(lat, lng, name) {
+  return `https://maps.google.com/?q=${encodeURIComponent(name)}&ll=${lat},${lng}&z=16`;
 }
 
 const ResourceCard = ({ resource, userLocation }) => {
@@ -56,7 +59,6 @@ const ResourceCard = ({ resource, userLocation }) => {
   return (
     <div style={s.card}>
       <div style={{ ...s.cardAccent, background: color }} />
-
       <div style={s.cardBody}>
         <div style={s.cardLeft}>
           <div style={{ ...s.typeIcon, background: `${color}18`, border: `1px solid ${color}30` }}>
@@ -64,33 +66,21 @@ const ResourceCard = ({ resource, userLocation }) => {
           </div>
           <div style={s.cardInfo}>
             <h4 style={s.cardName}>{resource.name}</h4>
-            {resource.address && (
-              <p style={s.cardAddr}>{resource.address}</p>
-            )}
+            {resource.address && <p style={s.cardAddr}>{resource.address}</p>}
             <div style={s.cardMeta}>
               <span style={{ ...s.badge, background: `${color}15`, color, border: `1px solid ${color}30` }}>
                 {resource.resource_type?.replace('_', ' ')}
               </span>
-              // After the existing badge span, add:
               {resource.source === 'ai_generated' && (
                 <span style={{
-                  padding: '2px 8px',
-                  background: 'rgba(139,92,246,0.15)',
-                  border: '1px solid rgba(139,92,246,0.3)',
-                  borderRadius: 6,
-                  fontSize: '0.68rem',
-                  color: '#a78bfa',
-                  fontWeight: 600,
+                  padding: '2px 8px', background: 'rgba(139,92,246,0.15)',
+                  border: '1px solid rgba(139,92,246,0.3)', borderRadius: 6,
+                  fontSize: '0.68rem', color: '#a78bfa', fontWeight: 600,
                 }}>
                   🤖 AI suggested
                 </span>
               )}
-              {resource.notes && (
-                <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: 2 }}>
-                  {resource.notes}
-                </span>
-              )}
-              {resource.distance_meters && (
+              {resource.distance_meters != null && (
                 <span style={s.dist}>
                   📍 {formatDistance(resource.distance_meters)} away
                 </span>
@@ -100,43 +90,31 @@ const ResourceCard = ({ resource, userLocation }) => {
                   📞 {resource.phone}
                 </a>
               )}
+              {resource.notes && (
+                <span style={{ fontSize: '0.72rem', color: '#64748b', display: 'block', marginTop: 2 }}>
+                  {resource.notes}
+                </span>
+              )}
             </div>
           </div>
         </div>
 
         <div style={s.cardActions}>
           {resource.phone && (
-            <a
-              href={`tel:${resource.phone}`}
-              style={{ ...s.actionBtn, ...s.callBtn }}
-              title="Call"
-            >
-              📞
-            </a>
+            <a href={`tel:${resource.phone}`} style={{ ...s.actionBtn, ...s.callBtn }} title="Call">📞</a>
           )}
           {userLocation && (
             <a
-              href={getDirectionsUrl(
-                userLocation.latitude, userLocation.longitude,
-                resource.latitude, resource.longitude
-              )}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ ...s.actionBtn, ...s.navBtn }}
-              title="Get directions"
-            >
-              🧭
-            </a>
+              href={getDirectionsUrl(userLocation.latitude, userLocation.longitude, resource.latitude, resource.longitude)}
+              target="_blank" rel="noopener noreferrer"
+              style={{ ...s.actionBtn, ...s.navBtn }} title="Get directions"
+            >🧭</a>
           )}
           <a
             href={getGoogleMapsUrl(resource.latitude, resource.longitude, resource.name)}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ ...s.actionBtn, ...s.mapBtn }}
-            title="View on map"
-          >
-            🗺️
-          </a>
+            target="_blank" rel="noopener noreferrer"
+            style={{ ...s.actionBtn, ...s.mapBtn }} title="View on map"
+          >🗺️</a>
         </div>
       </div>
     </div>
@@ -146,50 +124,71 @@ const ResourceCard = ({ resource, userLocation }) => {
 const NearbyResources = () => {
   const { t } = useLanguage();
 
-  const [resources,      setResources]      = useState([]);
-  const [filtered,       setFiltered]       = useState([]);
-  const [activeType,     setActiveType]     = useState('all');
-  const [userLocation,   setUserLocation]   = useState(null);
-  const [loading,        setLoading]        = useState(false);
-  const [locError,       setLocError]       = useState('');
-  const [fetchError,     setFetchError]     = useState('');
-  const [radius,         setRadius]         = useState(5000);
-  const [searched,       setSearched]       = useState(false);
-  const [aiEnriched, setAiEnriched] = useState(false);
+  const [resources,    setResources]    = useState([]);
+  const [filtered,     setFiltered]     = useState([]);
+  const [activeType,   setActiveType]   = useState('all');
+  const [userLocation, setUserLocation] = useState(null);
+  const [loading,      setLoading]      = useState(false);
+  const [locError,     setLocError]     = useState('');
+  const [fetchError,   setFetchError]   = useState('');
+  const [radius,       setRadius]       = useState(5000);
+  const [searched,     setSearched]     = useState(false);
+  const [aiEnriched,   setAiEnriched]   = useState(false);
 
-  const fetchNearby = useCallback(async (lat, lng) => {
+  // Keep a ref to the latest userLocation so callbacks stay stable
+  const userLocationRef = useRef(null);
+  useEffect(() => { userLocationRef.current = userLocation; }, [userLocation]);
+
+  // ── Core fetch function ────────────────────────────
+  // Takes lat/lng + current radius + current type directly
+  // so it always uses the latest values, not stale closure values.
+  const doFetch = useCallback(async (lat, lng, currentRadius, currentType) => {
     setLoading(true);
     setFetchError('');
     try {
-      const type = activeType === 'all' ? null : activeType;
-      const res  = await sosAPI.getNearby(lat, lng, radius, type);
+      const type = currentType === 'all' ? null : currentType;
+      const res  = await sosAPI.getNearby(lat, lng, currentRadius, type);
       const data = res.data?.resources || [];
       setResources(data);
       setFiltered(data);
       setAiEnriched(res.data?.meta?.ai_enriched || false);
       setSearched(true);
-    } catch (err) {
+    } catch {
       setFetchError('Could not load nearby resources. Make sure the backend is running.');
     } finally {
       setLoading(false);
     }
-  }, [radius, activeType]);
+  }, []); // stable — no deps needed, args are passed in
 
-  const locateAndFetch = useCallback(async () => {
+  // ── Get location then fetch ────────────────────────
+  const locateAndFetch = useCallback(async (overrideRadius, overrideType) => {
     setLocError('');
-    setLoading(true);
 
-    if (!navigator.geolocation) {
-      setLocError('Geolocation is not supported by your browser.');
-      setLoading(false);
+    // Use cached location if available so re-fetches on radius/type
+    // change don't need to ask for GPS again.
+    const existingLoc = userLocationRef.current;
+    if (existingLoc) {
+      await doFetch(
+        existingLoc.latitude,
+        existingLoc.longitude,
+        overrideRadius ?? radius,
+        overrideType  ?? activeType
+      );
       return;
     }
 
+    if (!navigator.geolocation) {
+      setLocError('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    setLoading(true);
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
+      async (pos) => {
         const loc = { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
         setUserLocation(loc);
-        fetchNearby(loc.latitude, loc.longitude);
+        userLocationRef.current = loc;
+        await doFetch(loc.latitude, loc.longitude, overrideRadius ?? radius, overrideType ?? activeType);
       },
       (err) => {
         setLocError(`Location error: ${err.message}. Please enable location access.`);
@@ -197,29 +196,43 @@ const NearbyResources = () => {
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  }, [fetchNearby]);
+  }, [doFetch, radius, activeType]);
 
-  // Filter locally when type changes (after initial fetch)
+  // ── Auto re-fetch when radius changes (if already searched) ──
+  // FIX: this was missing — previously radius change only updated
+  //      the state but never triggered a new API call.
   useEffect(() => {
-    if (!resources.length) return;
-    if (activeType === 'all') {
-      setFiltered(resources);
-    } else {
-      setFiltered(resources.filter(r => r.resource_type === activeType));
-    }
-  }, [activeType, resources]);
+    if (!searched || !userLocationRef.current) return;
+    doFetch(
+      userLocationRef.current.latitude,
+      userLocationRef.current.longitude,
+      radius,
+      activeType
+    );
+  }, [radius]); // eslint-disable-line react-hooks/exhaustive-deps
+  // intentionally only re-runs on radius change
+
+  // ── Auto re-fetch when type changes (if already searched) ────
+  // FIX: previously only filtered the stale local array.
+  //      Now asks backend for type-filtered + correctly-distanced results.
+  useEffect(() => {
+    if (!searched || !userLocationRef.current) return;
+    doFetch(
+      userLocationRef.current.latitude,
+      userLocationRef.current.longitude,
+      radius,
+      activeType
+    );
+  }, [activeType]); // eslint-disable-line react-hooks/exhaustive-deps
+  // intentionally only re-runs on activeType change
 
   const radiusOptions = [1000, 2000, 5000, 10000, 20000];
 
   return (
     <div style={s.container}>
-
-      {/* Header */}
       <div style={s.header}>
-        <div>
-          <h3 style={s.title}>🗺️ Nearby Safety Resources</h3>
-          <p style={s.subtitle}>Find hospitals, police stations, and safe zones near you</p>
-        </div>
+        <h3 style={s.title}>🗺️ Nearby Safety Resources</h3>
+        <p style={s.subtitle}>Find hospitals, police stations, and safe zones near you</p>
       </div>
 
       {/* Controls */}
@@ -232,6 +245,7 @@ const NearbyResources = () => {
                 key={r}
                 style={{ ...s.radiusBtn, ...(radius === r ? s.radiusBtnActive : {}) }}
                 onClick={() => setRadius(r)}
+                disabled={loading}
               >
                 {r >= 1000 ? `${r / 1000}km` : `${r}m`}
               </button>
@@ -239,28 +253,27 @@ const NearbyResources = () => {
           </div>
         </div>
 
-        <button style={s.locateBtn} onClick={locateAndFetch} disabled={loading}>
-          {loading ? (
-            <><span style={s.spin} /> Finding nearby...</>
-          ) : (
-            <> 📍 {searched ? 'Refresh' : 'Find Nearby Resources'}</>
-          )}
+        <button style={{ ...s.locateBtn, opacity: loading ? 0.7 : 1 }} onClick={() => locateAndFetch()} disabled={loading}>
+          {loading
+            ? <><span style={s.spin} /> Searching…</>
+            : <> 📍 {searched ? 'Refresh Location' : 'Find Nearby Resources'}</>
+          }
         </button>
       </div>
 
-      {/* Errors */}
       {(locError || fetchError) && (
         <div style={s.error}>{locError || fetchError}</div>
       )}
 
       {/* Type filter tabs */}
-      {searched && resources.length > 0 && (
+      {searched && (
         <div style={s.typeTabs}>
           {RESOURCE_TYPES.map(type => (
             <button
               key={type.key}
               style={{ ...s.typeTab, ...(activeType === type.key ? s.typeTabActive : {}) }}
               onClick={() => setActiveType(type.key)}
+              disabled={loading}
             >
               <span style={{ fontSize: 14 }}>{type.icon}</span>
               <span>{type.label}</span>
@@ -277,11 +290,19 @@ const NearbyResources = () => {
       {/* Results */}
       {searched && (
         <div style={s.results}>
-          {filtered.length === 0 ? (
+          {loading ? (
+            <div style={s.loadingBox}>
+              <span style={s.spin} />
+              <span style={{ color: '#64748b', fontSize: '0.9rem' }}>
+                Finding resources within {radius >= 1000 ? `${radius / 1000}km` : `${radius}m`}…
+              </span>
+            </div>
+          ) : filtered.length === 0 ? (
             <div style={s.empty}>
               <span style={{ fontSize: '2.5rem' }}>🔍</span>
               <p style={{ margin: '8px 0 0', color: '#CBD5E4' }}>
-                No {activeType === 'all' ? 'resources' : activeType.replace('_', ' ')} found within {radius >= 1000 ? `${radius / 1000}km` : `${radius}m`}.
+                No {activeType === 'all' ? 'resources' : activeType.replace('_', ' ')} found within{' '}
+                {radius >= 1000 ? `${radius / 1000}km` : `${radius}m`}.
               </p>
               <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
                 Try increasing the search radius.
@@ -290,8 +311,8 @@ const NearbyResources = () => {
           ) : (
             <>
               <p style={s.resultCount}>
-                {filtered.length} resource{filtered.length !== 1 ? 's' : ''} found
-                {userLocation ? ` within ${radius >= 1000 ? `${radius / 1000}km` : `${radius}m`}` : ''}
+                {filtered.length} resource{filtered.length !== 1 ? 's' : ''} found within{' '}
+                {radius >= 1000 ? `${radius / 1000}km` : `${radius}m`}
                 {aiEnriched && (
                   <span style={{ marginLeft: 8, color: '#a78bfa', fontSize: '0.75rem' }}>
                     · 🤖 AI-enriched
@@ -308,7 +329,7 @@ const NearbyResources = () => {
         </div>
       )}
 
-      {/* Empty state before search */}
+      {/* Empty state before first search */}
       {!searched && !loading && (
         <div style={s.emptyState}>
           <div style={s.emptyIcon}>🏥</div>
@@ -321,281 +342,53 @@ const NearbyResources = () => {
         </div>
       )}
 
-      <style>{`
-        @keyframes nr-spin { to { transform: rotate(360deg); } }
-      `}</style>
+      <style>{`@keyframes nr-spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 };
 
 const s = {
-  container: {
-    maxWidth: 700,
-    margin: '0 auto',
-    fontFamily: "'DM Sans', sans-serif",
-  },
-  header: {
-    marginBottom: 20,
-  },
-  title: {
-    fontFamily: "'Syne', sans-serif",
-    fontWeight: 700,
-    fontSize: '1.2rem',
-    color: '#fff',
-    margin: '0 0 4px',
-  },
-  subtitle: {
-    fontSize: '0.85rem',
-    color: '#64748b',
-    margin: 0,
-  },
-  controls: {
-    background: '#131929',
-    border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 14,
-  },
-  radiusRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  ctrlLabel: {
-    fontSize: '0.78rem',
-    color: '#64748b',
-    whiteSpace: 'nowrap',
-  },
-  radiusBtns: {
-    display: 'flex',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  radiusBtn: {
-    padding: '5px 12px',
-    background: '#1E2740',
-    border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: 20,
-    color: '#CBD5E4',
-    fontSize: '0.78rem',
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    transition: 'all 0.2s',
-  },
-  radiusBtnActive: {
-    background: 'rgba(230,57,70,0.15)',
-    borderColor: '#E63946',
-    color: '#FF6B74',
-  },
-  locateBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    padding: '12px 20px',
-    background: '#E63946',
-    border: 'none',
-    borderRadius: 10,
-    color: '#fff',
-    fontSize: '0.92rem',
-    fontWeight: 600,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    transition: 'all 0.2s',
-    justifyContent: 'center',
-  },
-  spin: {
-    display: 'inline-block',
-    width: 14,
-    height: 14,
-    border: '2px solid rgba(255,255,255,0.3)',
-    borderTopColor: '#fff',
-    borderRadius: '50%',
-    animation: 'nr-spin 0.7s linear infinite',
-  },
-  error: {
-    padding: '10px 14px',
-    background: 'rgba(230,57,70,0.1)',
-    border: '1px solid rgba(230,57,70,0.3)',
-    borderRadius: 8,
-    color: '#FF6B74',
-    fontSize: '0.83rem',
-    marginBottom: 14,
-  },
-  typeTabs: {
-    display: 'flex',
-    gap: 8,
-    flexWrap: 'wrap',
-    marginBottom: 16,
-  },
-  typeTab: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 5,
-    padding: '7px 12px',
-    background: '#131929',
-    border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: 20,
-    color: '#64748b',
-    fontSize: '0.8rem',
-    fontWeight: 500,
-    cursor: 'pointer',
-    fontFamily: 'inherit',
-    transition: 'all 0.2s',
-  },
-  typeTabActive: {
-    background: 'rgba(230,57,70,0.12)',
-    borderColor: '#E63946',
-    color: '#FF6B74',
-  },
-  typeCount: {
-    background: 'rgba(255,255,255,0.1)',
-    borderRadius: 10,
-    padding: '1px 6px',
-    fontSize: '0.68rem',
-  },
-  results: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-  },
-  resultCount: {
-    fontSize: '0.82rem',
-    color: '#64748b',
-    margin: '0 0 8px',
-  },
-  list: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-  },
-  card: {
-    background: '#131929',
-    border: '1px solid rgba(255,255,255,0.07)',
-    borderRadius: 12,
-    overflow: 'hidden',
-    transition: 'border-color 0.2s',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  cardAccent: {
-    height: 3,
-    width: '100%',
-    flexShrink: 0,
-  },
-  cardBody: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 14,
-    padding: '14px 16px',
-  },
-  cardLeft: {
-    display: 'flex',
-    alignItems: 'flex-start',
-    gap: 12,
-    flex: 1,
-    minWidth: 0,
-  },
-  typeIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 10,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  cardInfo: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 4,
-    minWidth: 0,
-  },
-  cardName: {
-    fontSize: '0.95rem',
-    fontWeight: 600,
-    color: '#fff',
-    margin: 0,
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  cardAddr: {
-    fontSize: '0.78rem',
-    color: '#64748b',
-    margin: 0,
-    whiteSpace: 'nowrap',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  cardMeta: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 8,
-    flexWrap: 'wrap',
-  },
-  badge: {
-    padding: '2px 8px',
-    borderRadius: 6,
-    fontSize: '0.7rem',
-    fontWeight: 500,
-    textTransform: 'capitalize',
-  },
-  dist: {
-    fontSize: '0.75rem',
-    color: '#94a3b8',
-  },
-  phoneLink: {
-    fontSize: '0.75rem',
-    color: '#10b981',
-    textDecoration: 'none',
-  },
-  cardActions: {
-    display: 'flex',
-    gap: 6,
-    flexShrink: 0,
-  },
-  actionBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    border: '1px solid rgba(255,255,255,0.07)',
-    background: '#1E2740',
-    fontSize: '1rem',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    textDecoration: 'none',
-    transition: 'all 0.2s',
-  },
-  callBtn: { border: '1px solid rgba(16,185,129,0.2)' },
-  navBtn:  { border: '1px solid rgba(59,130,246,0.2)' },
-  mapBtn:  { border: '1px solid rgba(255,255,255,0.07)' },
-  empty: {
-    textAlign: 'center',
-    padding: '40px 20px',
-    color: '#64748b',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 4,
-  },
-  emptyState: {
-    textAlign: 'center',
-    padding: '50px 20px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: 0,
-  },
-  emptyIcon: {
-    fontSize: '3.5rem',
-    lineHeight: 1,
-  },
+  container:  { maxWidth: 700, margin: '0 auto', fontFamily: "'DM Sans', sans-serif" },
+  header:     { marginBottom: 20 },
+  title:      { fontFamily: "'Syne', sans-serif", fontWeight: 700, fontSize: '1.2rem', color: '#fff', margin: '0 0 4px' },
+  subtitle:   { fontSize: '0.85rem', color: '#64748b', margin: 0 },
+  controls:   { background: '#131929', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, padding: 16, marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 14 },
+  radiusRow:  { display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' },
+  ctrlLabel:  { fontSize: '0.78rem', color: '#64748b', whiteSpace: 'nowrap' },
+  radiusBtns: { display: 'flex', gap: 6, flexWrap: 'wrap' },
+  radiusBtn:  { padding: '5px 12px', background: '#1E2740', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, color: '#CBD5E4', fontSize: '0.78rem', cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' },
+  radiusBtnActive: { background: 'rgba(230,57,70,0.15)', borderColor: '#E63946', color: '#FF6B74' },
+  locateBtn:  { display: 'flex', alignItems: 'center', gap: 8, padding: '12px 20px', background: '#E63946', border: 'none', borderRadius: 10, color: '#fff', fontSize: '0.92rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s', justifyContent: 'center' },
+  spin:       { display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'nr-spin 0.7s linear infinite' },
+  error:      { padding: '10px 14px', background: 'rgba(230,57,70,0.1)', border: '1px solid rgba(230,57,70,0.3)', borderRadius: 8, color: '#FF6B74', fontSize: '0.83rem', marginBottom: 14 },
+  typeTabs:   { display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 },
+  typeTab:    { display: 'flex', alignItems: 'center', gap: 5, padding: '7px 12px', background: '#131929', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 20, color: '#64748b', fontSize: '0.8rem', fontWeight: 500, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s' },
+  typeTabActive: { background: 'rgba(230,57,70,0.12)', borderColor: '#E63946', color: '#FF6B74' },
+  typeCount:  { background: 'rgba(255,255,255,0.1)', borderRadius: 10, padding: '1px 6px', fontSize: '0.68rem' },
+  results:    { display: 'flex', flexDirection: 'column', gap: 10 },
+  resultCount:{ fontSize: '0.82rem', color: '#64748b', margin: '0 0 8px' },
+  loadingBox: { display: 'flex', alignItems: 'center', gap: 10, padding: '30px 20px', justifyContent: 'center' },
+  list:       { display: 'flex', flexDirection: 'column', gap: 10 },
+  card:       { background: '#131929', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' },
+  cardAccent: { height: 3, width: '100%', flexShrink: 0 },
+  cardBody:   { display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px' },
+  cardLeft:   { display: 'flex', alignItems: 'flex-start', gap: 12, flex: 1, minWidth: 0 },
+  typeIcon:   { width: 44, height: 44, borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  cardInfo:   { display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 },
+  cardName:   { fontSize: '0.95rem', fontWeight: 600, color: '#fff', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  cardAddr:   { fontSize: '0.78rem', color: '#64748b', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+  cardMeta:   { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  badge:      { padding: '2px 8px', borderRadius: 6, fontSize: '0.7rem', fontWeight: 500, textTransform: 'capitalize' },
+  dist:       { fontSize: '0.75rem', color: '#94a3b8' },
+  phoneLink:  { fontSize: '0.75rem', color: '#10b981', textDecoration: 'none' },
+  cardActions:{ display: 'flex', gap: 6, flexShrink: 0 },
+  actionBtn:  { width: 36, height: 36, borderRadius: 8, border: '1px solid rgba(255,255,255,0.07)', background: '#1E2740', fontSize: '1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', textDecoration: 'none', transition: 'all 0.2s' },
+  callBtn:    { border: '1px solid rgba(16,185,129,0.2)' },
+  navBtn:     { border: '1px solid rgba(59,130,246,0.2)' },
+  mapBtn:     { border: '1px solid rgba(255,255,255,0.07)' },
+  empty:      { textAlign: 'center', padding: '40px 20px', color: '#64748b', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
+  emptyState: { textAlign: 'center', padding: '50px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 },
+  emptyIcon:  { fontSize: '3.5rem', lineHeight: 1 },
 };
 
 export default NearbyResources;

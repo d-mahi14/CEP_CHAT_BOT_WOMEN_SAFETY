@@ -10,7 +10,6 @@ const { authenticateUser } = require('../middleware/auth');
 const axios              = require('axios');
 
 // ── Static Legal Knowledge Base ────────────────────
-// Covers IPC sections, women-specific laws, rights
 const LEGAL_KNOWLEDGE = {
   sexual_harassment: {
     title: 'Sexual Harassment at Workplace',
@@ -194,26 +193,34 @@ router.get('/know-your-rights/:topic', authenticateUser, async (req, res) => {
 });
 
 // ── POST /api/legal/fir-draft ──────────────────────
+// FIX: audit log is now in its own try/catch so a DB failure
+//      can never prevent the FIR draft from being returned.
 router.post('/fir-draft', authenticateUser, async (req, res) => {
+  let draft;
   try {
-    const draft = generateFIRDraft(req.body);
+    draft = generateFIRDraft(req.body);
+  } catch (err) {
+    console.error('FIR generation error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to generate FIR draft' });
+  }
 
-    // Log to audit
+  // Audit log — wrapped separately so it never blocks the response
+  try {
     await supabase.from('audit_logs').insert([{
       user_id:       req.userId,
       action:        'fir_draft_generated',
       resource_type: 'legal',
       metadata:      { offense_type: req.body.offenseType },
-    }]).catch(() => {});
-
-    return res.json({ success: true, data: { draft } });
-  } catch (err) {
-    return res.status(500).json({ success: false, error: 'Failed to generate FIR draft' });
+    }]);
+  } catch (auditErr) {
+    // Non-critical — log to server console but don't fail the request
+    console.error('Audit log error (non-critical):', auditErr.message);
   }
+
+  return res.json({ success: true, data: { draft } });
 });
 
 // ── POST /api/legal/ai-legal-help ─────────────────
-// Uses Groq to answer legal queries in user's language
 router.post('/ai-legal-help', authenticateUser, async (req, res) => {
   try {
     const { question, language = 'en' } = req.body;
@@ -245,12 +252,12 @@ Return ONLY valid JSON: {"answer": "...", "relevant_sections": ["..."], "helplin
     const result = JSON.parse(raw);
     return res.json({ success: true, data: result });
   } catch (err) {
+    console.error('Legal AI error:', err.message);
     return res.status(500).json({ success: false, error: 'Legal AI service unavailable' });
   }
 });
 
 // ── GET /api/legal/analytics ───────────────────────
-// Module 30 — Analytics & Reports
 router.get('/analytics', authenticateUser, async (req, res) => {
   try {
     const userId = req.userId;
@@ -267,7 +274,6 @@ router.get('/analytics', authenticateUser, async (req, res) => {
     const chats     = chatRes.data || [];
     const contacts  = contactRes.data || [];
 
-    // SOS stats
     const sosStats = {
       total:       incidents.length,
       resolved:    incidents.filter(i => i.status === 'resolved').length,
@@ -277,34 +283,18 @@ router.get('/analytics', authenticateUser, async (req, res) => {
       avg_risk:    incidents.length ? Math.round(incidents.reduce((s, i) => s + (i.risk_score || 0), 0) / incidents.length) : 0,
     };
 
-    // Emergency type distribution
     const typeMap = {};
-    incidents.forEach(i => {
-      const t = i.emergency_type || 'other';
-      typeMap[t] = (typeMap[t] || 0) + 1;
-    });
+    incidents.forEach(i => { const t = i.emergency_type || 'other'; typeMap[t] = (typeMap[t] || 0) + 1; });
 
-    // Trigger type distribution
     const triggerMap = {};
-    incidents.forEach(i => {
-      const t = i.trigger_type || 'manual';
-      triggerMap[t] = (triggerMap[t] || 0) + 1;
-    });
+    incidents.forEach(i => { const t = i.trigger_type || 'manual'; triggerMap[t] = (triggerMap[t] || 0) + 1; });
 
-    // Chat intent distribution
     const intentMap = {};
-    chats.forEach(c => {
-      const k = c.intent || 'other';
-      intentMap[k] = (intentMap[k] || 0) + 1;
-    });
+    chats.forEach(c => { const k = c.intent || 'other'; intentMap[k] = (intentMap[k] || 0) + 1; });
 
-    // Emotion distribution
     const emotionMap = {};
-    chats.forEach(c => {
-      if (c.emotion) emotionMap[c.emotion] = (emotionMap[c.emotion] || 0) + 1;
-    });
+    chats.forEach(c => { if (c.emotion) emotionMap[c.emotion] = (emotionMap[c.emotion] || 0) + 1; });
 
-    // Monthly SOS trend (last 6 months)
     const monthly = {};
     const now = new Date();
     for (let i = 5; i >= 0; i--) {
