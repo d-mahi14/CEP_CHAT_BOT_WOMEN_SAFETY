@@ -104,21 +104,25 @@ const KnowYourRights = () => {
 
 // ── AI Legal Q&A ──────────────────────────────────
 const LegalQA = () => {
-  // 1. Get both translation function and language code from context
-  const { t, languageCode } = useLanguage(); 
-  
+  const { t, languageCode } = useLanguage();
+
   const [question, setQuestion] = useState('');
   const [answer, setAnswer] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // 2. Localize Example Questions via translation keys
-  const EXAMPLE_QS = [
+  // When language changes, clear any existing answer so it doesn't show stale language
+  useEffect(() => {
+    setAnswer(null);
+    setError('');
+  }, [languageCode]);
+
+  const EXAMPLE_QS = useMemo(() => [
     t('legal_example_1'),
     t('legal_example_2'),
     t('legal_example_3'),
     t('legal_example_4'),
-  ];
+  ], [t]);
 
   const ask = async (q) => {
     const text = (q || question).trim();
@@ -126,21 +130,21 @@ const LegalQA = () => {
     setLoading(true);
     setAnswer(null);
     setError('');
-    
+
     try {
       const h = await getHeaders();
-      // 3. Pass the languageCode to the backend so the AI knows which language to output
       const r = await axios.post(
-        `${NODE_API}/api/legal/ai-legal-help`, 
-        { 
+        `${NODE_API}/api/legal/ai-legal-help`,
+        {
           question: text,
-          language: languageCode // Backend uses this to steer the LLM response
-        }, 
+          language: languageCode,   // Pass current language to backend
+          languageName: getLanguageName(languageCode), // Human-readable name for prompt
+        },
         { headers: h }
       );
       setAnswer(r.data?.data);
-    } catch { 
-      setError(t('legal_error')); 
+    } catch {
+      setError(t('legal_error'));
     }
     setLoading(false);
   };
@@ -148,7 +152,7 @@ const LegalQA = () => {
   return (
     <div>
       <p className="la-subtitle">{t('legal_subtitle_qa')}</p>
-      
+
       <div className="la-qa-input-row">
         <input
           className="la-qa-input"
@@ -164,9 +168,9 @@ const LegalQA = () => {
 
       <div className="la-example-prompts">
         {EXAMPLE_QS.map((q, index) => (
-          <button 
-            key={index} 
-            className="la-example-btn" 
+          <button
+            key={index}
+            className="la-example-btn"
             onClick={() => { setQuestion(q); ask(q); }}
           >
             {q}
@@ -178,9 +182,8 @@ const LegalQA = () => {
 
       {answer && (
         <div className="la-answer-card">
-          {/* AI generated answer will now be in the requested language */}
           <p className="la-answer-text">{answer.answer}</p>
-          
+
           {answer.relevant_sections?.length > 0 && (
             <div className="la-answer-section">
               <strong>{t('legal_answer_sections')}:</strong>
@@ -230,7 +233,7 @@ const FIRDraft = () => {
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const OFFENSE_TYPES = useMemo(() => 
+  const OFFENSE_TYPES = useMemo(() =>
     Object.entries(TOPIC_META).map(([k, v]) => ({ value: k, label: v.label })), []
   );
 
@@ -321,6 +324,16 @@ const FIRDraft = () => {
   );
 };
 
+// ── Language name helper ───────────────────────────
+function getLanguageName(code) {
+  const NAMES = {
+    en: 'English', hi: 'Hindi', ta: 'Tamil', te: 'Telugu',
+    mr: 'Marathi', bn: 'Bengali', gu: 'Gujarati', kn: 'Kannada',
+    ml: 'Malayalam', pa: 'Punjabi',
+  };
+  return NAMES[code] || 'English';
+}
+
 // ── Main Legal Assistant Component ─────────────────
 const LegalAssistant = () => {
   const [tab, setTab] = useState('rights');
@@ -335,14 +348,14 @@ const LegalAssistant = () => {
   return (
     <div className="la-container">
       <div className="la-tab-bar">
-        {TABS.map(t => (
+        {TABS.map(tab_ => (
           <button
-            key={t.key}
-            className={`la-tab ${tab === t.key ? 'active' : ''}`}
-            onClick={() => setTab(t.key)}
+            key={tab_.key}
+            className={`la-tab ${tab === tab_.key ? 'active' : ''}`}
+            onClick={() => setTab(tab_.key)}
           >
-            <span style={{ fontSize: 16 }}>{t.icon}</span>
-            <span>{t.label}</span>
+            <span style={{ fontSize: 16 }}>{tab_.icon}</span>
+            <span>{tab_.label}</span>
           </button>
         ))}
       </div>
@@ -354,7 +367,6 @@ const LegalAssistant = () => {
       </div>
 
       <style>{`
-        /* ... existing styles remain unchanged ... */
         .la-container{max-width:760px;margin:0 auto;font-family:'DM Sans',sans-serif}
         .la-tab-bar{display:flex;gap:0;border:1px solid rgba(255,255,255,.08);border-radius:12px;overflow:hidden;margin-bottom:20px}
         .la-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:12px 8px;background:#131929;border:none;color:#64748b;font-size:.85rem;font-weight:500;cursor:pointer;transition:all .2s;font-family:inherit;border-right:1px solid rgba(255,255,255,.07)}

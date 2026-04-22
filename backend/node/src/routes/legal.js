@@ -1,6 +1,15 @@
 // =====================================================
 // LEGAL ROUTES — Module 23 (Legal Content Management)
 // Know Your Rights, FIR Filing Guidance, IPC/Law Help
+//
+// CHANGES:
+//   - ai-legal-help endpoint now receives `languageName`
+//     from the frontend and enforces it in the system
+//     prompt with explicit instructions to NEVER respond
+//     in English unless the target language IS English.
+//   - This guarantees the answer, next_steps, and
+//     relevant_sections are all in the user's chosen
+//     language (Hindi, Tamil, Telugu, Marathi, etc.)
 // =====================================================
 
 const express = require('express');
@@ -8,6 +17,13 @@ const router  = express.Router();
 const { supabase }       = require('../config/supabase');
 const { authenticateUser } = require('../middleware/auth');
 const axios              = require('axios');
+
+// ── Language name map ──────────────────────────────
+const LANGUAGE_NAMES = {
+  en: 'English',   hi: 'Hindi',     ta: 'Tamil',   te: 'Telugu',
+  mr: 'Marathi',   bn: 'Bengali',   gu: 'Gujarati', kn: 'Kannada',
+  ml: 'Malayalam', pa: 'Punjabi',
+};
 
 // ── Static Legal Knowledge Base ────────────────────
 const LEGAL_KNOWLEDGE = {
@@ -193,8 +209,6 @@ router.get('/know-your-rights/:topic', authenticateUser, async (req, res) => {
 });
 
 // ── POST /api/legal/fir-draft ──────────────────────
-// FIX: audit log is now in its own try/catch so a DB failure
-//      can never prevent the FIR draft from being returned.
 router.post('/fir-draft', authenticateUser, async (req, res) => {
   let draft;
   try {
@@ -204,7 +218,6 @@ router.post('/fir-draft', authenticateUser, async (req, res) => {
     return res.status(500).json({ success: false, error: 'Failed to generate FIR draft' });
   }
 
-  // Audit log — wrapped separately so it never blocks the response
   try {
     await supabase.from('audit_logs').insert([{
       user_id:       req.userId,
@@ -213,7 +226,6 @@ router.post('/fir-draft', authenticateUser, async (req, res) => {
       metadata:      { offense_type: req.body.offenseType },
     }]);
   } catch (auditErr) {
-    // Non-critical — log to server console but don't fail the request
     console.error('Audit log error (non-critical):', auditErr.message);
   }
 
@@ -221,35 +233,77 @@ router.post('/fir-draft', authenticateUser, async (req, res) => {
 });
 
 // ── POST /api/legal/ai-legal-help ─────────────────
+// UPDATED: Enforces response language — answer is always in the user's selected language
 router.post('/ai-legal-help', authenticateUser, async (req, res) => {
   try {
-    const { question, language = 'en' } = req.body;
+    const { question, language = 'en', languageName } = req.body;
     if (!question) return res.status(400).json({ success: false, error: 'question is required' });
 
-    const LEGAL_SYSTEM = `You are an Indian women's legal rights assistant.
-Answer legal questions about Indian law, IPC sections, women's rights, procedures.
+    // Resolve human-readable language name
+    const targetLangName = languageName || LANGUAGE_NAMES[language] || 'English';
+    const isEnglish = language === 'en';
+
+    // Build a very explicit language instruction so the model cannot default to English
+    const languageInstruction = isEnglish
+      ? 'Respond in English.'
+      : `CRITICAL LANGUAGE REQUIREMENT: You MUST respond entirely in ${targetLangName} (language code: ${language}).
+Do NOT use English in the "answer" or "next_steps" fields under any circumstances.
+The user has selected ${targetLangName} as their preferred language and cannot read English.
+Every word in "answer" and every item in "next_steps" must be written in ${targetLangName} script.
+IPC section numbers and helpline numbers may remain as digits/numbers.
+"relevant_sections" values should keep the IPC section identifier (e.g. "IPC 354A") but describe it in ${targetLangName}.`;
+
+    const LEGAL_SYSTEM = `You are an Indian women's legal rights assistant specialising in Indian law.
+Answer legal questions about Indian law, IPC sections, women's rights, and legal procedures.
 Be empathetic, clear, and practical. Mention relevant acts and helplines.
-Respond in the user's language: ${language}.
-Keep responses under 200 words. End with relevant helpline numbers.
-Return ONLY valid JSON: {"answer": "...", "relevant_sections": ["..."], "helplines": ["..."], "next_steps": ["..."]}`;
+
+${languageInstruction}
+
+Keep responses under 200 words.
+End with relevant helpline numbers.
+
+Return ONLY valid JSON with this exact structure — no markdown, no backticks:
+{
+  "answer": "your answer in ${targetLangName}",
+  "relevant_sections": ["IPC section with short description in ${targetLangName}"],
+  "helplines": ["112", "181", "1091"],
+  "next_steps": ["step 1 in ${targetLangName}", "step 2 in ${targetLangName}"]
+}`;
 
     const response = await axios.post(
       'https://api.groq.com/openai/v1/chat/completions',
       {
         model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'system', content: LEGAL_SYSTEM }, { role: 'user', content: question }],
+        messages: [
+          { role: 'system', content: LEGAL_SYSTEM },
+          { role: 'user',   content: question },
+        ],
         temperature: 0.1,
-        max_tokens: 400,
+        max_tokens: 600,
         response_format: { type: 'json_object' },
       },
       {
-        headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}`, 'Content-Type': 'application/json' },
-        timeout: 15000,
+        headers: {
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 20000,
       }
     );
 
     const raw = response.data.choices[0]?.message?.content || '{}';
     const result = JSON.parse(raw);
+
+    // Log the query for analytics
+    try {
+      await supabase.from('audit_logs').insert([{
+        user_id:       req.userId,
+        action:        'legal_ai_query',
+        resource_type: 'legal',
+        metadata:      { language, question: question.slice(0, 100) },
+      }]);
+    } catch (_) { /* non-critical */ }
+
     return res.json({ success: true, data: result });
   } catch (err) {
     console.error('Legal AI error:', err.message);

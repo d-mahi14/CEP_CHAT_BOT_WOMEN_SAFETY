@@ -3,6 +3,11 @@
 // =====================================================
 // Frontend service for all SOS-related API calls
 // Modules: 4, 5, 9, 13, 15
+//
+// CHANGES:
+//   - getNearby() now accepts a `language` parameter
+//     and passes it to the backend so the Groq AI
+//     generates resource notes in the user's language.
 // =====================================================
 
 import axios from 'axios';
@@ -89,10 +94,16 @@ export const sosAPI = {
 
   /**
    * Get nearby safety resources (Module 15)
+   * @param {number} lat - Latitude
+   * @param {number} lng - Longitude
+   * @param {number} radius - Search radius in metres (default 5000)
+   * @param {string|null} type - Resource type filter (null = all)
+   * @param {string} language - BCP47 language code for AI-generated notes (default 'en')
    */
-  getNearby: async (lat, lng, radius = 5000, type = null) => {
+  getNearby: async (lat, lng, radius = 5000, type = null, language = 'en') => {
     const params = new URLSearchParams({ lat, lng, radius });
     if (type) params.append('type', type);
+    if (language) params.append('language', language);
     const res = await axios.get(`${NODE_API_URL}/api/sos/nearby?${params}`);
     return res.data;
   },
@@ -110,12 +121,12 @@ export const getCurrentLocation = () =>
     }
     navigator.geolocation.getCurrentPosition(
       (pos) => resolve({
-        latitude: pos.coords.latitude,
+        latitude:  pos.coords.latitude,
         longitude: pos.coords.longitude,
-        accuracy: pos.coords.accuracy,
-        altitude: pos.coords.altitude,
-        speed: pos.coords.speed,
-        heading: pos.coords.heading,
+        accuracy:  pos.coords.accuracy,
+        altitude:  pos.coords.altitude,
+        speed:     pos.coords.speed,
+        heading:   pos.coords.heading,
       }),
       (err) => reject(err),
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -132,9 +143,9 @@ export const watchLocation = (onUpdate, onError) => {
   }
   return navigator.geolocation.watchPosition(
     (pos) => onUpdate({
-      latitude: pos.coords.latitude,
+      latitude:  pos.coords.latitude,
       longitude: pos.coords.longitude,
-      accuracy: pos.coords.accuracy,
+      accuracy:  pos.coords.accuracy,
     }),
     (err) => onError?.(err),
     { enableHighAccuracy: true, maximumAge: 5000 }

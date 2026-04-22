@@ -1,25 +1,37 @@
 // =====================================================
 // NearbyResources.jsx — Module 15: Nearby Safety Resources
 // =====================================================
-// FIX: Changing the search radius or resource type now
-//      triggers a fresh API call instead of just
-//      re-filtering the stale cached results.
-//      Previously, distances shown were from the old
-//      cached fetch so "iDream" would show 1.4km on 1km
-//      radius even though it's actually 2.3km away.
+// CHANGES:
+//   - All UI labels, buttons, status messages, and
+//     resource type names are now pulled from the
+//     translation system via useLanguage() so they
+//     display in the user's selected language.
+//   - languageCode is passed to the backend API so
+//     the Groq AI generates resource descriptions /
+//     notes in the user's language.
+//   - Added translation keys: nearby_title,
+//     nearby_subtitle, nearby_radius_label,
+//     nearby_find_btn, nearby_refresh, nearby_finding,
+//     nearby_no_results, nearby_ai_suggested,
+//     nearby_ai_enriched, nearby_away, nearby_directions,
+//     nearby_call, nearby_map, nearby_open_map,
+//     nearby_resource_hospital, nearby_resource_police,
+//     nearby_resource_safe_zone, nearby_resource_shelter,
+//     nearby_resource_fire_station, nearby_resource_all
 // =====================================================
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { sosAPI } from '../../services/sosService';
 import { useLanguage } from '../../context/LanguageContext';
 
-const RESOURCE_TYPES = [
-  { key: 'all',             label: 'All',           icon: '📍' },
-  { key: 'hospital',        label: 'Hospitals',      icon: '🏥' },
-  { key: 'police_station',  label: 'Police',         icon: '👮' },
-  { key: 'safe_zone',       label: 'Safe Zones',     icon: '🛡️' },
-  { key: 'shelter',         label: 'Shelters',       icon: '🏠' },
-  { key: 'fire_station',    label: 'Fire Station',   icon: '🚒' },
+// Resource type config — labels pulled from translations at render time
+const RESOURCE_TYPE_KEYS = [
+  { key: 'all',             tKey: 'nearby_resource_all',          icon: '📍' },
+  { key: 'hospital',        tKey: 'nearby_resource_hospital',     icon: '🏥' },
+  { key: 'police_station',  tKey: 'nearby_resource_police',       icon: '👮' },
+  { key: 'safe_zone',       tKey: 'nearby_resource_safe_zone',    icon: '🛡️' },
+  { key: 'shelter',         tKey: 'nearby_resource_shelter',      icon: '🏠' },
+  { key: 'fire_station',    tKey: 'nearby_resource_fire_station', icon: '🚒' },
 ];
 
 const TYPE_COLORS = {
@@ -38,10 +50,10 @@ const TYPE_ICONS = {
   fire_station:   '🚒',
 };
 
-function formatDistance(meters) {
+function formatDistance(meters, t) {
   if (!meters && meters !== 0) return null;
-  if (meters < 1000) return `${Math.round(meters)}m`;
-  return `${(meters / 1000).toFixed(1)}km`;
+  if (meters < 1000) return `${Math.round(meters)}m ${t('nearby_away') || 'away'}`;
+  return `${(meters / 1000).toFixed(1)}km ${t('nearby_away') || 'away'}`;
 }
 
 function getDirectionsUrl(userLat, userLng, destLat, destLng) {
@@ -52,7 +64,7 @@ function getGoogleMapsUrl(lat, lng, name) {
   return `https://maps.google.com/?q=${encodeURIComponent(name)}&ll=${lat},${lng}&z=16`;
 }
 
-const ResourceCard = ({ resource, userLocation }) => {
+const ResourceCard = ({ resource, userLocation, t }) => {
   const color = TYPE_COLORS[resource.resource_type] || '#64748b';
   const icon  = TYPE_ICONS[resource.resource_type]  || '📍';
 
@@ -77,12 +89,12 @@ const ResourceCard = ({ resource, userLocation }) => {
                   border: '1px solid rgba(139,92,246,0.3)', borderRadius: 6,
                   fontSize: '0.68rem', color: '#a78bfa', fontWeight: 600,
                 }}>
-                  🤖 AI suggested
+                  {t('nearby_ai_suggested') || '🤖 AI suggested'}
                 </span>
               )}
               {resource.distance_meters != null && (
                 <span style={s.dist}>
-                  📍 {formatDistance(resource.distance_meters)} away
+                  📍 {formatDistance(resource.distance_meters, t)}
                 </span>
               )}
               {resource.phone && (
@@ -101,19 +113,22 @@ const ResourceCard = ({ resource, userLocation }) => {
 
         <div style={s.cardActions}>
           {resource.phone && (
-            <a href={`tel:${resource.phone}`} style={{ ...s.actionBtn, ...s.callBtn }} title="Call">📞</a>
+            <a href={`tel:${resource.phone}`} style={{ ...s.actionBtn, ...s.callBtn }}
+               title={t('nearby_call') || 'Call'}>📞</a>
           )}
           {userLocation && (
             <a
               href={getDirectionsUrl(userLocation.latitude, userLocation.longitude, resource.latitude, resource.longitude)}
               target="_blank" rel="noopener noreferrer"
-              style={{ ...s.actionBtn, ...s.navBtn }} title="Get directions"
+              style={{ ...s.actionBtn, ...s.navBtn }}
+              title={t('nearby_directions') || 'Get directions'}
             >🧭</a>
           )}
           <a
             href={getGoogleMapsUrl(resource.latitude, resource.longitude, resource.name)}
             target="_blank" rel="noopener noreferrer"
-            style={{ ...s.actionBtn, ...s.mapBtn }} title="View on map"
+            style={{ ...s.actionBtn, ...s.mapBtn }}
+            title={t('nearby_open_map') || 'View on map'}
           >🗺️</a>
         </div>
       </div>
@@ -122,7 +137,7 @@ const ResourceCard = ({ resource, userLocation }) => {
 };
 
 const NearbyResources = () => {
-  const { t } = useLanguage();
+  const { t, languageCode } = useLanguage();
 
   const [resources,    setResources]    = useState([]);
   const [filtered,     setFiltered]     = useState([]);
@@ -135,37 +150,32 @@ const NearbyResources = () => {
   const [searched,     setSearched]     = useState(false);
   const [aiEnriched,   setAiEnriched]   = useState(false);
 
-  // Keep a ref to the latest userLocation so callbacks stay stable
   const userLocationRef = useRef(null);
   useEffect(() => { userLocationRef.current = userLocation; }, [userLocation]);
 
-  // ── Core fetch function ────────────────────────────
-  // Takes lat/lng + current radius + current type directly
-  // so it always uses the latest values, not stale closure values.
+  // ── Core fetch — passes languageCode to backend ──
   const doFetch = useCallback(async (lat, lng, currentRadius, currentType) => {
     setLoading(true);
     setFetchError('');
     try {
       const type = currentType === 'all' ? null : currentType;
-      const res  = await sosAPI.getNearby(lat, lng, currentRadius, type);
+      const res  = await sosAPI.getNearby(lat, lng, currentRadius, type, languageCode);
       const data = res.data?.resources || [];
       setResources(data);
       setFiltered(data);
       setAiEnriched(res.data?.meta?.ai_enriched || false);
       setSearched(true);
     } catch {
-      setFetchError('Could not load nearby resources. Make sure the backend is running.');
+      setFetchError(t('nearby_error') || 'Could not load nearby resources. Make sure the backend is running.');
     } finally {
       setLoading(false);
     }
-  }, []); // stable — no deps needed, args are passed in
+  }, [languageCode, t]);
 
   // ── Get location then fetch ────────────────────────
   const locateAndFetch = useCallback(async (overrideRadius, overrideType) => {
     setLocError('');
 
-    // Use cached location if available so re-fetches on radius/type
-    // change don't need to ask for GPS again.
     const existingLoc = userLocationRef.current;
     if (existingLoc) {
       await doFetch(
@@ -178,7 +188,7 @@ const NearbyResources = () => {
     }
 
     if (!navigator.geolocation) {
-      setLocError('Geolocation is not supported by your browser.');
+      setLocError(t('nearby_geo_unsupported') || 'Geolocation is not supported by your browser.');
       return;
     }
 
@@ -191,54 +201,44 @@ const NearbyResources = () => {
         await doFetch(loc.latitude, loc.longitude, overrideRadius ?? radius, overrideType ?? activeType);
       },
       (err) => {
-        setLocError(`Location error: ${err.message}. Please enable location access.`);
+        setLocError(`${t('nearby_location_error') || 'Location error'}: ${err.message}`);
         setLoading(false);
       },
       { enableHighAccuracy: true, timeout: 10000 }
     );
-  }, [doFetch, radius, activeType]);
+  }, [doFetch, radius, activeType, t]);
 
-  // ── Auto re-fetch when radius changes (if already searched) ──
-  // FIX: this was missing — previously radius change only updated
-  //      the state but never triggered a new API call.
+  // Re-fetch when radius changes (after first search)
   useEffect(() => {
     if (!searched || !userLocationRef.current) return;
-    doFetch(
-      userLocationRef.current.latitude,
-      userLocationRef.current.longitude,
-      radius,
-      activeType
-    );
+    doFetch(userLocationRef.current.latitude, userLocationRef.current.longitude, radius, activeType);
   }, [radius]); // eslint-disable-line react-hooks/exhaustive-deps
-  // intentionally only re-runs on radius change
 
-  // ── Auto re-fetch when type changes (if already searched) ────
-  // FIX: previously only filtered the stale local array.
-  //      Now asks backend for type-filtered + correctly-distanced results.
+  // Re-fetch when type filter changes (after first search)
   useEffect(() => {
     if (!searched || !userLocationRef.current) return;
-    doFetch(
-      userLocationRef.current.latitude,
-      userLocationRef.current.longitude,
-      radius,
-      activeType
-    );
+    doFetch(userLocationRef.current.latitude, userLocationRef.current.longitude, radius, activeType);
   }, [activeType]); // eslint-disable-line react-hooks/exhaustive-deps
-  // intentionally only re-runs on activeType change
 
   const radiusOptions = [1000, 2000, 5000, 10000, 20000];
+
+  // Translate resource type labels at render time
+  const RESOURCE_TYPES = RESOURCE_TYPE_KEYS.map(rt => ({
+    ...rt,
+    label: t(rt.tKey) || rt.key.replace('_', ' '),
+  }));
 
   return (
     <div style={s.container}>
       <div style={s.header}>
-        <h3 style={s.title}>🗺️ Nearby Safety Resources</h3>
-        <p style={s.subtitle}>Find hospitals, police stations, and safe zones near you</p>
+        <h3 style={s.title}>{t('nearby_title') || '🗺️ Nearby Safety Resources'}</h3>
+        <p style={s.subtitle}>{t('nearby_subtitle') || 'Find hospitals, police stations, and safe zones near you'}</p>
       </div>
 
       {/* Controls */}
       <div style={s.controls}>
         <div style={s.radiusRow}>
-          <span style={s.ctrlLabel}>Search radius:</span>
+          <span style={s.ctrlLabel}>{t('nearby_radius_label') || 'Search radius:'}</span>
           <div style={s.radiusBtns}>
             {radiusOptions.map(r => (
               <button
@@ -253,10 +253,17 @@ const NearbyResources = () => {
           </div>
         </div>
 
-        <button style={{ ...s.locateBtn, opacity: loading ? 0.7 : 1 }} onClick={() => locateAndFetch()} disabled={loading}>
+        <button
+          style={{ ...s.locateBtn, opacity: loading ? 0.7 : 1 }}
+          onClick={() => locateAndFetch()}
+          disabled={loading}
+        >
           {loading
-            ? <><span style={s.spin} /> Searching…</>
-            : <> 📍 {searched ? 'Refresh Location' : 'Find Nearby Resources'}</>
+            ? <><span style={s.spin} /> {t('nearby_finding') || 'Searching…'}</>
+            : <> 📍 {searched
+                ? (t('nearby_refresh') || 'Refresh Location')
+                : (t('nearby_find_btn') || 'Find Nearby Resources')
+              }</>
           }
         </button>
       </div>
@@ -294,34 +301,32 @@ const NearbyResources = () => {
             <div style={s.loadingBox}>
               <span style={s.spin} />
               <span style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                Finding resources within {radius >= 1000 ? `${radius / 1000}km` : `${radius}m`}…
+                {t('nearby_finding') || 'Finding resources'} {radius >= 1000 ? `${radius / 1000}km` : `${radius}m`}…
               </span>
             </div>
           ) : filtered.length === 0 ? (
             <div style={s.empty}>
               <span style={{ fontSize: '2.5rem' }}>🔍</span>
               <p style={{ margin: '8px 0 0', color: '#CBD5E4' }}>
-                No {activeType === 'all' ? 'resources' : activeType.replace('_', ' ')} found within{' '}
-                {radius >= 1000 ? `${radius / 1000}km` : `${radius}m`}.
-              </p>
-              <p style={{ margin: '4px 0 0', fontSize: '0.82rem', color: '#64748b' }}>
-                Try increasing the search radius.
+                {t('nearby_no_results') || `No resources found. Try increasing the search radius.`}
               </p>
             </div>
           ) : (
             <>
               <p style={s.resultCount}>
-                {filtered.length} resource{filtered.length !== 1 ? 's' : ''} found within{' '}
-                {radius >= 1000 ? `${radius / 1000}km` : `${radius}m`}
+                {filtered.length} {filtered.length !== 1
+                  ? (t('nearby_resources_found_many') || 'resources found')
+                  : (t('nearby_resources_found_one') || 'resource found')
+                } {t('nearby_within') || 'within'} {radius >= 1000 ? `${radius / 1000}km` : `${radius}m`}
                 {aiEnriched && (
                   <span style={{ marginLeft: 8, color: '#a78bfa', fontSize: '0.75rem' }}>
-                    · 🤖 AI-enriched
+                    · {t('nearby_ai_enriched') || '🤖 AI-enriched'}
                   </span>
                 )}
               </p>
               <div style={s.list}>
                 {filtered.map(r => (
-                  <ResourceCard key={r.id} resource={r} userLocation={userLocation} />
+                  <ResourceCard key={r.id} resource={r} userLocation={userLocation} t={t} />
                 ))}
               </div>
             </>
@@ -334,10 +339,10 @@ const NearbyResources = () => {
         <div style={s.emptyState}>
           <div style={s.emptyIcon}>🏥</div>
           <p style={{ color: '#CBD5E4', margin: '12px 0 6px', fontSize: '1rem', fontWeight: 500 }}>
-            Find safety resources near you
+            {t('nearby_empty_title') || 'Find safety resources near you'}
           </p>
           <p style={{ color: '#64748b', margin: 0, fontSize: '0.85rem' }}>
-            Tap the button above to locate nearby hospitals, police stations, shelters, and safe zones.
+            {t('nearby_empty_sub') || 'Tap the button above to locate nearby hospitals, police stations, shelters, and safe zones.'}
           </p>
         </div>
       )}
