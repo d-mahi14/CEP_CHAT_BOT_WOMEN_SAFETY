@@ -171,7 +171,10 @@ export const translations = {
     legal_example_3: "How do I register a complaint at the workplace?",
     legal_example_4: "What are my rights if I am harassed in public?",
     nav_nearby:      'Nearby',
-    nav_nearby_desc: 'Safety Map'
+    nav_nearby_desc: 'Safety Map',
+    nearby_refresh:'Refresh',
+    nearby_find_btn:'Search Nearby',
+    nearby_finding:'Finding'
   },
 
   hi: {
