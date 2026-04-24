@@ -130,7 +130,7 @@ async function analyzeMessage(text, { conversationHistory = [], userLanguage = '
 
 // ─────────────────────────────────────────────────
 // MODULE 20 — MULTILINGUAL RESPONSE
-// Responds to user in their detected language
+// Responds to user in the    ir detected language
 // ─────────────────────────────────────────────────
 
 const LANGUAGE_NAMES = {
