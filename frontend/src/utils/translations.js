@@ -4,6 +4,48 @@
 
 export const translations = {
   en: {
+        // Nearby — replace the 3 stubs already there and add all missing ones
+    nearby_title:                'Safe Spaces Near You',
+    nearby_subtitle:             'Find hospitals, police stations, and safe zones near you',
+    nearby_radius_label:         'Search radius:',
+    nearby_find_btn:             'Find Nearby Resources',
+    nearby_refresh:              'Refresh Location',
+    nearby_finding:              'Searching…',
+    nearby_no_results:           'No resources found. Try increasing the search radius.',
+    nearby_ai_suggested:         '🤖 AI suggested',
+    nearby_ai_enriched:          '🤖 AI-enriched',
+    nearby_away:                 'away',
+    nearby_directions:           'Directions',
+    nearby_call:                 'Call',
+    nearby_map:                  'Map',
+    nearby_open_map:             'View on map',
+    nearby_error:                'Could not load nearby resources. Make sure the backend is running.',
+    nearby_geo_unsupported:      'Geolocation is not supported by your browser.',
+    nearby_location_error:       'Location error',
+    nearby_empty_title:          'Find safety resources near you',
+    nearby_empty_sub:            'Tap the button above to locate nearby hospitals, police stations, shelters, and safe zones.',
+    nearby_resources_found_one:  'resource found',
+    nearby_resources_found_many: 'resources found',
+    nearby_within:               'within',
+    nearby_resource_all:         'All',
+    nearby_resource_hospital:    'Hospitals',
+    nearby_resource_police:      'Police',
+    nearby_resource_safe_zone:   'Safe Zones',
+    nearby_resource_shelter:     'Shelters',
+    nearby_resource_fire_station:'Fire Stations',
+
+    // Helplines — these were in en already but double-check these exist
+    hl_all:               'All',
+    hl_police:            'Police',
+    hl_medical:           'Medical',
+    hl_fire:              'Fire',
+    hl_women:             'Women',
+    hl_child:             'Child',
+    hl_mental:            'Mental Health',
+    hl_legal:             'Legal',
+    hl_police_emergency:  'Police Emergency',
+    hl_medical_emergency: 'Ambulance / Medical',
+    hl_fire_emergency:    'Fire Brigade',
     nav_sos:       'SOS',
     nav_sos_desc:  'Emergency',
     nav_ai:        'AI Help',
@@ -174,7 +216,10 @@ export const translations = {
     nav_nearby_desc: 'Safety Map',
     nearby_refresh:'Refresh',
     nearby_find_btn:'Search Nearby',
-    nearby_finding:'Finding'
+    nearby_finding:'Finding',
+    nearby_title:'Safe Spaces Near You',
+    nearby_subtitle:'Find hospital,police station,etc. near you.',
+    nearby_radius_label:'Distance'
   },
 
   hi: {
