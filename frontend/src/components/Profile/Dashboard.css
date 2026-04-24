@@ -23,7 +23,7 @@
   --text-faint: #374151;
   --success:    #10B981;
   --blue:       #3B82F6;
-  --sidebar-w:  260px;
+  --sidebar-w:  280px;
 }
 
 /* ─── Loading screen ─────────────────────────────── */
@@ -107,7 +107,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 4px 8px 20px;
+  padding: 4px 4px 20px;
   border-bottom: 1px solid var(--border);
   margin-bottom: 16px;
   position: relative;
@@ -135,10 +135,13 @@
 .db-logo-text {
   font-family: 'Syne', sans-serif;
   font-weight: 800;
-  font-size: 1.1rem;
+  font-size: 1rem;          /* was 1.1rem */
   color: var(--white);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.03em;   /* was 0.05em */
   text-transform: uppercase;
+  white-space: nowrap;       /* ADD THIS */
+  overflow: hidden;          /* ADD THIS */
+  text-overflow: ellipsis;   /* ADD THIS */
 }
 
 /* ─── User card in sidebar ────────────────────────── */
